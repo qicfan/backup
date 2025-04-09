@@ -1,23 +1,45 @@
+import { IBestNavBar, IBestButton } from "@ibestservices/ibest-ui-v2";
+
 @Entry
 @Component
 struct Index {
-  @State message: string = 'Hello World';
+
+  @Builder
+  rightBuilder() {
+    Image($r("app.media.gearshape"))
+      .width(24)
+      .height(24)
+      .fillColor('#000')
+  }
 
   build() {
-    RelativeContainer() {
-      Text(this.message)
-        .id('HelloWorld')
-        .fontSize($r('app.float.page_text_font_size'))
-        .fontWeight(FontWeight.Bold)
-        .alignRules({
-          center: { anchor: '__container__', align: VerticalAlign.Center },
-          middle: { anchor: '__container__', align: HorizontalAlign.Center }
+    Column(){
+      IBestNavBar({
+        title: "相册备份",
+        isShowLeft: false,
+        isShowRight: true,
+        rightIcon: "app.media.gearshape",
+        rightLabel: "设置",
+        onRightClick: () => {
+          // 弹出设置窗口
+        }
+      })
+      Column() {
+        Text("主体区域")
+      }
+        .layoutWeight(1)
+        .padding(10)
+      Column() {
+        IBestButton({
+          text: '开始备份',
+          type: 'primary'
         })
-        .onClick(() => {
-          this.message = 'Welcome';
-        })
+      }
+        .width('100%')
+        .padding({right: 10})
+        .alignItems(HorizontalAlign.End)
     }
-    .height('100%')
-    .width('100%')
+      .width('100%')
+      .height('100%')
   }
 }

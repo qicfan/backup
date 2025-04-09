@@ -1,6 +1,20 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\qicfa\\.ohos\\config\\default_Backup_0--hfZ3VOXl-DdP2VjTaLy5qf_43zzA-vVOY56OCEoQ=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B739C49DE49671664597D495DF7FDBB0CBF0DFA7D1BD68B65D09073ECEAD98337F1E74E96E8CFC2",
+          "profile": "C:\\Users\\qicfa\\.ohos\\config\\default_Backup_0--hfZ3VOXl-DdP2VjTaLy5qf_43zzA-vVOY56OCEoQ=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\qicfa\\.ohos\\config\\default_Backup_0--hfZ3VOXl-DdP2VjTaLy5qf_43zzA-vVOY56OCEoQ=.p12",
+          "storePassword": "0000001B9BF53C1101B5401210E807226C679E1644BB4EAC80D0DF3CC132B9C32FF461676782619B0C50B0"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
