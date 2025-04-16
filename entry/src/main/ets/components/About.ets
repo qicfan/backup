@@ -38,6 +38,11 @@ export struct About {
           .textAlign(TextAlign.Start)
           .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
           .fontColor($r("app.color.ibest_field_prefix_font_color"))
+        Text("基于IBest-UI构建")
+          .width('100%')
+          .textAlign(TextAlign.Start)
+          .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+          .fontColor($r("app.color.ibest_field_prefix_font_color"))
       }
       .padding($r('app.float.normal_padding'))
       .backgroundColor($r("app.color.ibest_search_inner_background"))

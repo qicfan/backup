@@ -213,9 +213,6 @@ export class Task {
     }
   }
 
-  // 执行任务
-  process() {}
-
   // 查询待执行的任务
   static async getWaitList() {
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);

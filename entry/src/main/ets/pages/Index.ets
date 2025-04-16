@@ -3,9 +3,7 @@ import { ServerConfig } from "../models/Server";
 import { AppStorageV2 } from "@kit.ArkUI";
 import { abilityAccessCtrl, common, WantAgent, wantAgent } from "@kit.AbilityKit";
 import { Global } from "../models/Global";
-import { AccessStatus, ConfigGlobalStatus, LoginStatus, LowBatteryStop,
-  OnlyWIFIBackup,
-  TaskDoing, TaskStatus } from "../typing";
+import { AccessStatus, ConfigGlobalStatus, LoginStatus, LowBatteryStop, OnlyWIFIBackup, TaskDoing } from "../typing";
 import { Config } from "../models/Config";
 import { Settings } from "../components/Settings";
 import { Login } from "../components/Login";
@@ -29,10 +27,9 @@ struct Index {
   @Local global: Global = AppStorageV2.connect(Global, "global", () => new Global())!;
   private ctxUIAbility: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack()
-  @Local loading: boolean = false;
   private stop: boolean = false; // 是否停止执行
-  private canProcess: boolean = true; // 是否能执行，比如WIFI，网络连接断开等
   private jobId: number = 0;
+  @Local creatingTask: boolean = false;
 
   aboutToAppear() {
     this.server.queryAsset().then((exists: boolean) => {
@@ -64,49 +61,31 @@ struct Index {
     }).catch(() => {
       return this.pageInfos.replacePath({ name: "login" })
     })
-    // 等待触发新任务生成的事件
+    // 等开始收集相册内的新内容并生成任务
     emitter.on(Global.START_COLLECT_PHOTO_EVENT, () => {
-      // 开始生成新任务
-      console.log("准备生成新任务")
-      IBestNotify.show({
-        message: "正在扫描新照片并生成备份任务...",
-        type: "warning",
-        duration: 500000
-      })
-      Task.createTask(getContext(this)).then(() => {
-        if (this.global.taskGlobalStatus == TaskDoing.YES) {
-          IBestNotify.close();
-          return ;
-        }
-        setTimeout(() => {
-          this.global.taskGlobalStatus = TaskDoing.NO;
-          IBestNotify.close();
-          // 执行任务
-          emitter.emit(Global.START_WAIT_TASK_EVENT);
-        }, 1000)
-      }).catch(() => {
-        if (this.global.taskGlobalStatus == TaskDoing.YES) {
-          IBestNotify.close();
-          return ;
-        }
-        setTimeout(() => {
-          this.global.taskGlobalStatus = TaskDoing.NO;
-          IBestNotify.close();
-          emitter.emit(Global.START_WAIT_TASK_EVENT);
-        }, 1000)
-      })
+      this.startCreateTask()
     })
 
-    // 等待触发未完成任务继续执行的事件
-    emitter.on(Global.START_WAIT_TASK_EVENT, () => {
-      // 触发任务执行
-      if (this.global.processId  > 0) {
-        console.log("有正在执行的任务，本次不执行")
-      } else {
-        console.log("执行任务")
-        this.process()
-      }
+    // 开始执行未完成的任务
+    emitter.on(Global.START_WAIT_TASK_EVENT, (data) => {
+      console.log("收到开始任务通知：" + data.data?.id)
+      const taskId: number = data.data?.id;
+      this.startTask(taskId)
     })
+
+    // 暂停任务
+    emitter.on(Global.STOP_TASK_EVENT, (data) => {
+      console.log("收到暂停任务通知：" + data.data?.id)
+      const taskId: number = data.data?.id;
+      this.stopTask(taskId, true)
+    })
+  }
+
+  onPageShow(): void {
+    // 从后台转入前台时触发生成新任务
+    setTimeout(() => {
+      emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
+    }, 3000)
   }
 
   checkPerm(): Promise<boolean> {
@@ -130,22 +109,9 @@ struct Index {
 
   }
 
-  onPageShow(): void {
-    console.log('index show')
-    setTimeout(() => {
-      this.checkPerm().then((p) => {
-        if (!p) {
-          return;
-        }
-        emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
-      })
-    }, 3000)
-  }
-
   checkBattery() {
     if (this.config.lowBatteryStop === LowBatteryStop.YES) {
       if (getBatteryLevel() <= 15) {
-        this.canProcess = false;
         IBestNotify.show({
           message: "已打开低电量不备份，当前电量低于15%，不启动备份任务",
           type: "warning",
@@ -161,7 +127,6 @@ struct Index {
     if (this.config.onlyWifi === OnlyWIFIBackup.YES) {
       const netType = await getCurrentNetType();
       if (netType == connection.NetBearType.BEARER_CELLULAR) {
-        this.canProcess = false;
         IBestNotify.show({
           message: "已打开仅wifi备份，当前使用移动网络，不启动备份任务",
           type: "warning",
@@ -173,44 +138,124 @@ struct Index {
     return true;
   }
 
-  // 触发执行备份任务
-  async process() {
-    const p = this.checkPerm();
-    if (!p) return ;
-    if (this.jobId > 0) return ;
-    this.checkBattery();
-    this.checkWifi();
-    if (!this.canProcess) return;
+  // 是否开源启动任务执行
+  async canStart(): Promise<boolean> {
+    // 检查是否授权读取相册
+    if (!(await this.checkPerm())) {
+      return false;
+    }
+    // 如果打开了低电量暂停任务，则检查电量
+    if (!this.checkBattery()) {
+      return false;
+    }
+    // 如果打开了仅WIFI备份，则检查网络状态
+    if (!(await this.checkWifi())) {
+      return false;
+    }
     if (this.config.backupRootPath === "") {
       IBestNotify.show({
         message: "请先设置备份路径",
         type: "warning",
         duration: 3000
       })
-      return;
+      return false;
     }
-    const task = await Task.getWaitList();
-    if (task === undefined) {
+    // 如果已经触发了停止，则不会开始执行新任务
+    if (this.stop) {
+      return false;
+    }
+    return true;
+  }
+
+  // 是否开源收集照片并生成任务
+  async canCreateTask(): Promise<boolean> {
+    // 检查是否授权读取相册
+    if (!(await this.checkPerm())) {
+      return false;
+    }
+    // 如果正在创建备份任务
+    if (this.creatingTask) {
+      return false;
+    }
+    return true;
+  }
+
+  // 开始任务
+  async startTask(taskId?: number): Promise<boolean> {
+    if (!this.canStart()) {
+      return false;
+    }
+    if (this.global.processId > 0) {
+      // 暂停该任务，然后启动新任务
+      await this.stopTask(this.global.processId);
+    }
+    let waitTask: Task | undefined;
+    if (!taskId) {
+      waitTask = await Task.getWaitList();
+    } else {
+      waitTask = new Task();
+      waitTask.id = taskId;
+      await waitTask.fetch()
+    }
+    if (waitTask === undefined) {
       // 没有要执行的任务
       console.log("没有要执行的任务");
-      return;
+      return false;
     }
-    console.log("开始执行任务：" + task.id)
-    this.global.taskGlobalStatus = TaskDoing.YES
+    console.log("开始执行任务：" + waitTask.id)
     this.stop = false;
-    this.startBackground(task)
+    this.global.processId = waitTask.id;
+    this.startBackground(waitTask)
+    return true;
   }
 
   // 停止任务
-  stopTask(task:Task) {
-    this.stop = true;
+  async stopTask(taskOrId: number | Task, pause: boolean = false) {
+    let task: Task;
+    if (typeof taskOrId == "number") {
+      task = new Task();
+      task.id = taskOrId;
+      await task.fetch()
+    } else {
+      task = taskOrId;
+    }
     this.global.processId = 0;
-    task.finish();
+    this.jobId = 0;
+    if (pause) this.stop = true;
+    await task.finish();
+    // 取消长时任务
+    backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
+  }
+
+
+
+  async startCreateTask(): Promise<boolean> {
+    if (!this.canCreateTask()) {
+      return false;
+    }
+    console.log("准备生成新任务")
+    IBestNotify.show({
+      message: "正在扫描新照片并生成备份任务...",
+      type: "warning",
+      duration: 500000
+    })
+    try {
+      await Task.createTask(getContext(this))
+    } catch (e) {
+
+    } finally {
+      setTimeout(() => {
+        IBestNotify.close();
+        // 触发任务执行
+        emitter.emit(Global.START_WAIT_TASK_EVENT);
+      }, 1000)
+    }
+    return true;
   }
 
   startBackground(task: Task) {
-    const webdav = new WebDav(this.server);
-    let wantAgentInfo: wantAgent.WantAgentInfo = {
+    this.webdav.updateSerConfig(this.server)
+    const wantAgentInfo: wantAgent.WantAgentInfo = {
       // 点击通知后，将要执行的动作列表
       wants: [{ bundleName: "com.xaxx.backup", abilityName: "EntryAbility" }],
       // 点击通知后，动作类型
@@ -221,6 +266,7 @@ struct Index {
       wantAgentFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
     };
     try {
+      // 监听停止长时任务
       backgroundTaskManager.on("continuousTaskCancel", () => {
         // 标记任务状态，然后停止上传
         this.stopTask(task);
@@ -231,24 +277,32 @@ struct Index {
           let list: Array<string> = ["dataTransfer"];
           backgroundTaskManager.startBackgroundRunning(this.ctxUIAbility, list, wantAgentObj)
             .then(async (res: backgroundTaskManager.ContinuousTaskNotification) => {
-              console.info("Operation startBackgroundRunning succeeded");
-              emitter.emit(Global.START_TASK_EVENT, { data: { id: task.id } })
+              console.info("开始执行长时任务，上传照片");
+              // 触发UI更新，显示任务进度
+              emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
               // 对于上传下载类的长时任务，应用可以使用res中返回的notificationId来更新通知，比如发送带进度条的模板通知。
               this.jobId = res.notificationId;
-              console.info("Operation startBackgroundRunning jobId: " + this.jobId);
+              console.info("长时任务ID: " + this.jobId);
+              // 将任务标记为开始执行
               await task.start();
-              console.log(`task ${task.id} started`)
+              emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
+              console.log(`任务 ${task.id} 开始执行...`)
               let page = 1;
               let pageSize = 100;
-              console.log(`取第 ${page} 页数据`)
+              const updateProgressHandleId = setTimeout(() => {
+                if (this.jobId <= 0) {
+                  clearTimeout(updateProgressHandleId);
+                  return ;
+                }
+                // 每秒更新一次任务进度
+                this.updateProcess(task);
+                return ;
+              }, 1000)
               while (true) {
                 let curTotal = 0;
                 const items: TaskItem[] = await task.getWaitItems(page, pageSize)
                 for (let item of items) {
-                  if (this.stop) {
-                    // 停止执行
-                    break
-                  }
+                  if (this.stop)  break;
                   if (!this.checkBattery()) {
                     // 电量低于15%，停止
                     this.stop = true;
@@ -259,49 +313,47 @@ struct Index {
                     this.stop = true;
                     break;
                   }
-                  curTotal ++
+                  curTotal++
                   task.preUploadedSize = task.uploadedSize;
-                  item.updateWebDav(webdav, this.config)
+                  item.updateWebDav(this.webdav, this.config)
                   try {
-                    const rs = await item.upload(this.updateProcess)
+                    const rs = await item.upload()
                     if (rs) {
                       task.success++
                     } else {
-                      task.failed ++;
+                      task.failed++;
                     }
                     await task.updateStat(task.success, task.failed);
-                  } catch(e) {
-                    task.failed ++;
+                  } catch (e) {
+                    task.failed++;
                     await task.updateStat(task.success, task.failed);
                   } finally {
                     // 触发UI更新
-                    emitter.emit(Global.START_TASK_EVENT, { data: { id: task.id } })
-                    this.updateProcess(task)
+                    emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
                   }
                 }
                 if (curTotal >= pageSize && !this.stop) {
-                  page ++;
+                  page++;
                   continue;
                 }
-                await task.finish();
-                // 触发UI更新
-                this.global.taskGlobalStatus = TaskDoing.NO;
-                this.jobId = 0;
+                // 完成任务
+                this.stopTask(task)
                 setTimeout(() => {
-                  emitter.emit(Global.START_TASK_EVENT, { data: { id: task.id } })
+                  // 触发UI刷新
+                  emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
+                  if (!this.stop) {
+                    // 触发下一次执行
+                    emitter.emit(Global.START_WAIT_TASK_EVENT)
+                  }
                 }, 1000)
-                // 取消长时任务
-                backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
-                // 触发下一次执行
-                emitter.emit(Global.START_WAIT_TASK_EVENT)
                 break;
               }
             })
             .catch((error: BusinessError) => {
-              console.error(`Operation startBackgroundRunning failed. code is ${error.code} message is ${error.message}`);
+              console.error(`启动长时任务失败. code is ${error.code} message is ${error.message}`);
             });
         } catch (error) {
-          console.error(`Operation startBackgroundRunning failed. code is ${(error as BusinessError).code} message is ${(error as BusinessError).message}`);
+          console.error(`启动长时任务失败. code is ${(error as BusinessError).code} message is ${(error as BusinessError).message}`);
         }
       });
     } catch (error) {
@@ -331,6 +383,9 @@ struct Index {
           typeCode: 8, // 上传下载类型需要填写 8，当前仅支持此类型。保持不变
           title: "正在备份照片", // 应用自定义
           text: `进度：${cur}/${task.total}`, // 应用自定义
+          capsule: {
+            title: `备份进度：${cur}/${task.total}`
+          }
         }
       },
       id: this.jobId, // 必须是申请长时任务返回的id，否则应用更新通知失败。
@@ -340,12 +395,11 @@ struct Index {
 
     try {
       notificationManager.publish(request).then(() => {
-        console.info("publish success, id= " + this.jobId);
       }).catch((err: BusinessError) => {
-        console.error(`publish fail: ${JSON.stringify(err)}`);
+        console.error(`更新长时任务进度失败: code: ${err.code}. msg: ${err.message}`);
       });
     } catch (err) {
-      console.error(`publish fail: ${JSON.stringify(err)}`);
+      console.error(`更新长时任务进度失败: code: ${err.code}. msg: ${err.message}`);
     }
   }
 

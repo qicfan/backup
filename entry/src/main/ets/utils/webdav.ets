@@ -60,16 +60,6 @@ export class WebDav {
     this.session?.close();
   }
 
-  public static async validServer(server: string, username: string, password: string): Promise<RequestReturn> {
-    const serverConfig = new ServerConfig();
-    serverConfig.server = server;
-    serverConfig.username = username;
-    serverConfig.password = password;
-    const webdav = new WebDav(serverConfig);
-    const validRs = webdav.valid();
-    return validRs;
-  }
-
   // 发送请求
   async request(req: rcp.Request) {
     const requestReturn: RequestReturn = new RequestReturn();
@@ -176,7 +166,7 @@ export class WebDav {
     return await this.request(req);
   }
 
-  async upload(taskItem: TaskItem, updateProgress: (task: Task) =>void): Promise<boolean> {
+  async upload(taskItem: TaskItem): Promise<boolean> {
     // 读取文件
     let uploadFile: fileIo.File;
     let uploadBuffer: ArrayBuffer = new ArrayBuffer(taskItem.size);
@@ -192,11 +182,10 @@ export class WebDav {
         // console.info("Upload progress:", transferredSize, "of", totalSize);
         taskItem.updateUploadedSize(transferredSize)
         taskItem.task.updateUploadedSize(transferredSize)
-        updateProgress(taskItem.task);
       }
     };
     const url = `${taskItem.config.backupRootPath}/${taskItem.remoteUri}`
-    console.log(`要上传的文件：${taskItem.fileUri}, 远程路径：${taskItem.remoteUri}, url: ${url}`)
+    // console.log(`要上传的文件：${taskItem.fileUri}, 远程路径：${taskItem.remoteUri}, url: ${url}`)
     const req = new rcp.Request(url, "PUT", {}, uploadBuffer, {}, {}, {tracing: {httpEventsHandler: customHttpEventsHandler} });
     const rr = await this.request(req);
     if (rr.success) {

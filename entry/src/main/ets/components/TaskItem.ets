@@ -1,8 +1,7 @@
-import { IBestLoading, IBestProgress } from "@ibestservices/ibest-ui-v2"
+import { IBestIcon, IBestLoading, IBestProgress } from "@ibestservices/ibest-ui-v2"
 import { Task } from "../models/Task"
-import { TaskStatus, TaskType } from "../typing";
+import { TaskStatus } from "../typing";
 import { dateTimeFromTimestamp } from "../utils/date";
-import { Cell } from "./Cell"
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 
@@ -13,12 +12,12 @@ export struct TaskItem {
 
   @Computed
   get process() {
-    return Math.floor(this.task.uploadedSize / this.task.size * 100)
+    return parseFloat((this.task.uploadedSize / this.task.size * 100).toFixed(2))
   }
 
   @Computed
   get statusName() {
-    switch(this.task.status) {
+    switch (this.task.status) {
       case TaskStatus.WAIT:
         return '等待备份';
       case TaskStatus.PROCESS:
@@ -29,18 +28,32 @@ export struct TaskItem {
   }
 
   aboutToAppear(): void {
-    emitter.on(Global.START_TASK_EVENT, (data) => {
-      const id: undefined | number = data?.data?.id;
-      if (id && id === this.task.id) {
-        this.doing = true;
-        this.task.fetch().then(() => {
-          console.log("开始更新任务" + data?.data?.id + `的UI状态, status=${this.task.status}, 已上传字节: ${this.task.uploadedSize}， 总字节：${this.task.size}, 进度: ${this.process}`)
-          if (this.task.status === TaskStatus.FINISH) {
-            this.doing = false;
-          }
-        })
-      }
+    emitter.on(Global.UPDATE_TASK_EVENT, (data) => {
+      this.updateTask(data?.data?.id);
     })
+  }
+
+  updateTask(id: number) {
+    if (id && id === this.task.id) {
+      this.doing = true;
+      this.task.fetch().then(() => {
+        // console.log("开始更新任务" + data?.data?.id +
+        //   `的UI状态, status=${this.task.status}, 已上传字节: ${this.task.uploadedSize}， 总字节：${this.task.size}, 进度: ${this.process}`)
+        if (this.task.status === TaskStatus.FINISH) {
+          this.doing = false;
+        }
+      })
+    }
+  }
+
+  startTask() {
+    console.log("发送开始任务通知：" + this.task.id)
+    emitter.emit(Global.START_WAIT_TASK_EVENT, { data: {id: this.task.id }});
+  }
+
+  stopTask() {
+    console.log("发送暂停任务通知：" + this.task.id)
+    emitter.emit(Global.STOP_TASK_EVENT, { data: {id: this.task.id }});
   }
 
   build() {
@@ -59,6 +72,9 @@ export struct TaskItem {
               justifyContent: FlexAlign.SpaceBetween,
               alignItems: ItemAlign.Center
             }) {
+              if (this.doing) {
+                IBestLoading({ loadingSize: 18 })
+              }
               Text(this.statusName)
                 .textAlign(TextAlign.Start)
               Text(dateTimeFromTimestamp(this.task.createdAt))
@@ -82,14 +98,29 @@ export struct TaskItem {
           }
           .layoutWeight(1)
 
-          if (this.doing) {
-            Column() {
-              IBestLoading()
+          Column() {
+            if (this.task.status == TaskStatus.WAIT) {
+              IBestIcon({ name: "play-circle-o", iconSize: 24, color: Color.Blue })
             }
-            .width(24)
-            .alignItems(HorizontalAlign.Center)
-            .justifyContent(FlexAlign.Center)
+            if (this.task.status == TaskStatus.PROCESS) {
+              IBestIcon({ name: "pause-circle-o", iconSize: 24 })
+            }
+            if (this.task.status == TaskStatus.FINISH) {
+              IBestIcon({ name: "passed", iconSize: 24, color: Color.Green })
+            }
           }
+          .width(24)
+          .alignItems(HorizontalAlign.Center)
+          .justifyContent(FlexAlign.Center)
+          .margin({ left: $r('app.float.inner_padding') })
+          .onClick(() => {
+            if (this.task.status == TaskStatus.WAIT) {
+              this.startTask();
+            }
+            if (this.task.status == TaskStatus.PROCESS) {
+              this.stopTask();
+            }
+          })
         }
         .padding($r('app.float.normal_padding'))
         .backgroundColor($r("app.color.ibest_search_inner_background"))

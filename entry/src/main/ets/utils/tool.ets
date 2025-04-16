@@ -107,7 +107,7 @@ export async function getCurrentNetType(): Promise<connection.NetBearType> {
 export function getBatteryLevel(): number {
   try {
     const batteryLevel = batteryInfo.batterySOC;
-    console.log(`当前电量: ${batteryLevel}%`);
+    // console.log(`当前电量: ${batteryLevel}%`);
     return batteryLevel;
   } catch (error) {
     console.error('获取电量失败:', (error as BusinessError).message);

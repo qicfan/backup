@@ -137,7 +137,6 @@ export class TaskItem {
       "date_added": this.dateAdded,
       "date_modified": this.dateModified,
     };
-    console.log(`要插入task item数据：${JSON.stringify(insertBucket)}`)
     try {
       const rowId =
         await DB.dbInstance?.store?.insert(TaskItem.TABLE_NAME, insertBucket,
@@ -156,7 +155,7 @@ export class TaskItem {
   // 3. 检查文件是否存在，如果存在则检查状态是否完成，如果完成则跳过，如果未完成则删除
   // 4. 上传文件
   // 5. 修改状态
-  async upload(updateProgress: (task: Task) =>void): Promise<boolean> {
+  async upload(): Promise<boolean> {
     if (this.status !== TaskItemStatus.WAIT) return true;
     const dirList: string[] = this.remoteUri.split('/').filter(part => part.length > 0);
     dirList.pop();
@@ -190,6 +189,6 @@ export class TaskItem {
       return false;
     }
     // 上传文件
-    return await this.webdav.upload(this, updateProgress);
+    return await this.webdav.upload(this);
   }
 }
