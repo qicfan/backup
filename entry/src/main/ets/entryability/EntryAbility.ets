@@ -11,7 +11,7 @@ const DOMAIN = 0x0000;
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
-    checkPermissions(this.context, 'ohos.permission.READ_IMAGEVIDEO'); // 申请权限
+    // checkPermissions(this.context, 'ohos.permission.READ_IMAGEVIDEO'); // 申请权限
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 

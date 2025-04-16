@@ -43,6 +43,8 @@ export struct TaskItem {
           this.doing = false;
         }
       })
+    } else {
+      this.doing = false;
     }
   }
 

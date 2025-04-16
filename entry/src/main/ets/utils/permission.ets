@@ -30,13 +30,13 @@ export async function checkPermissionGrant(permission: Permissions): Promise<abi
   return grantStatus;
 }
 
-export async function checkPermissions(context: common.UIAbilityContext, p: Permissions): Promise<void> {
+export async function checkPermissions(context: common.UIAbilityContext, p: Permissions): Promise<boolean> {
   let grantStatus1: boolean = await checkPermissionGrant(p) === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;// 获取精确定位权限状态
   // 精确定位权限只能跟模糊定位权限一起申请，或者已经有模糊定位权限才能申请精确定位权限
   if (!grantStatus1) {
-    reqPermissionsFromUser(context, [p])
+    return await reqPermissionsFromUser(context, [p])
   }
-  return
+  return true
 }
 // 'ohos.permission.READ_IMAGEVIDEO'
 export async function reqPermissionsFromUser(context: common.UIAbilityContext, p: Permissions[]) {

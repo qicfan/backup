@@ -1,6 +1,6 @@
 import { IBestNotify, IBestPicker, IBestPickerOption, IBestPopup } from "@ibestservices/ibest-ui-v2"
 import { Config } from "../models/Config";
-import { BackupType, ConfigGlobalStatus, LowBatteryStop, OnlyWIFIBackup } from "../typing"
+import { AUTOBackup, BackupType, ConfigGlobalStatus, LowBatteryStop, OnlyWIFIBackup } from "../typing"
 import { Cell } from "./Cell"
 import { AppStorageV2, ComponentContent } from "@kit.ArkUI";
 import { Dialog } from "../utils/dialog";
@@ -37,6 +37,14 @@ export struct Settings {
     { text: '备份所有照片', value: "all" },
     { text: '备份新照片', value: "new" },
   ]
+  private backupTypeMap: Record<BackupType, string> = {
+    1: "备份所有照片",
+    2: "备份新照片"
+  }
+  private backupTypeDescMap: Record<BackupType, string> = {
+    1: "第一次备份相册内所有照片，后续为增量备份",
+    2: "只备份当前时间后新增的照片，后续为增量"
+  }
   private ctx: UIContext = this.getUIContext();
   // 登录弹窗的节点
   private loginDialogContentNode: ComponentContent<Object> =
@@ -97,6 +105,15 @@ export struct Settings {
       })
   }
 
+  @Builder
+  buildAuto() {
+    Toggle({ type: ToggleType.Switch, isOn: this.config.auto === AUTOBackup.YES ? true : false })
+      .onChange((isOn: boolean) => {
+        this.config.auto = isOn ? AUTOBackup.YES : AUTOBackup.NO;
+        this.config.update();
+      })
+  }
+
   aboutToAppear(): void {
     this.backupTypeValue = this.config.backupType == BackupType.ALL ? ['all'] : ['new']
   }
@@ -119,28 +136,15 @@ export struct Settings {
               // 跳转到登录页面
               this.pageInfos.pushPath({ name: "login", param: true });
             })
-          if (this.config.backupType === BackupType.ALL) {
-            Cell({
-              title: "备份范围",
-              left: "备份所有照片",
-              content: "第一次备份相册内所有照片，后续为增量备份",
-              showArrow: true
+          Cell({
+            title: "备份范围",
+            left: this.backupTypeMap[this.config.backupType],
+            content: this.backupTypeDescMap[this.config.backupType],
+            showArrow: true
+          })
+            .onClick(() => {
+              this.showBackupTypePopup = true
             })
-              .onClick(() => {
-
-                this.showBackupTypePopup = true
-              })
-          } else {
-            Cell({
-              title: "备份范围",
-              left: "备份新照片",
-              content: "只备份当前时间后新增的照片，后续为增量",
-              showArrow: true
-            })
-              .onClick(() => {
-                this.showBackupTypePopup = true
-              })
-          }
           if (this.config.backupRootPath === "") {
             Cell({ title: "备份路径", content: "点击设置", showArrow: true })
               .onClick(() => {
@@ -163,6 +167,13 @@ export struct Settings {
             left: "非WIFI停止备份",
             rightBuilder: () => {
               this.buildOnlyWifi()
+            }
+          })
+          Cell({
+            left: "自动备份",
+            content: "每次进入APP都自动启动备份，如果关闭需要手动点击“开始备份”或者每个任务的“开始”按钮",
+            rightBuilder: () => {
+              this.buildAuto()
             }
           })
 

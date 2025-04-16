@@ -141,7 +141,7 @@ export class TaskItem {
       const rowId =
         await DB.dbInstance?.store?.insert(TaskItem.TABLE_NAME, insertBucket,
           relationalStore.ConflictResolution.ON_CONFLICT_IGNORE);
-      console.info(`task item insert row: ${rowId}`);
+      // console.info(`task item insert row: ${rowId}`);
       return true;
     } catch (err) {
       console.error(`task items ${this.remoteUri} insert failed, code is ${err.code},message is ${err.message}`);

@@ -6,6 +6,7 @@ export enum BackupType {ALL = 1, NEW = 2}
 export enum DirRule {YMD = 'yyyy/mm/dd', YM = 'yyyy/mm', Y = 'yyyy'}
 export enum LowBatteryStop {YES = 1, NO = 2}
 export enum OnlyWIFIBackup {YES = 1, NO = 2}
+export enum AUTOBackup {YES = 1, NO = 2}
 export enum TaskType {AUTO = 1, Manual = 2}
 export enum TaskStatus {WAIT = 1, PROCESS = 2, FINISH = 3}
 export enum PhotoType {IMAGE = 1, VIDEO = 2}

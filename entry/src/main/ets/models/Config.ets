@@ -1,4 +1,4 @@
-import { BackupType, ConfigGlobalStatus, DirRule, LowBatteryStop, OnlyWIFIBackup } from "../typing"
+import { AUTOBackup, BackupType, ConfigGlobalStatus, DirRule, LowBatteryStop, OnlyWIFIBackup } from "../typing"
 import { DB } from "./DB"
 import { relationalStore } from "@kit.ArkData";
 import { Global } from "./Global";
@@ -13,6 +13,7 @@ export class Config {
   @Trace backupRootPath: string = "";
   @Trace dirRule: DirRule = DirRule.YMD;
   @Trace lowBatteryStop: LowBatteryStop = LowBatteryStop.YES;
+  @Trace auto: AUTOBackup = AUTOBackup.YES;
   @Trace onlyWifi: OnlyWIFIBackup = OnlyWIFIBackup.YES;
   updatedAt: number = 0;
   private db: DB | null = null;
@@ -33,6 +34,7 @@ export class Config {
         this.dirRule = rs.getString(rs.getColumnIndex("dir_rule")) as DirRule
         this.lowBatteryStop = rs.getLong(rs.getColumnIndex("low_battery_stop"))
         this.onlyWifi = rs.getLong(rs.getColumnIndex("only_wifi_backup"))
+        this.auto = rs.getLong(rs.getColumnIndex("auto"))
         this.updatedAt = rs.getLong(rs.getColumnIndex("updated_at"))
         rs.close();
         if (this.backupRootPath == "") return 3;
@@ -53,6 +55,7 @@ export class Config {
       "dir_rule": this.dirRule,
       "low_battery_stop": this.lowBatteryStop,
       "only_wifi_backup": this.onlyWifi,
+      "auto": this.auto,
       "updated_at": Math.floor(Date.now() / 1000)
     };
     let predicates = new relationalStore.RdbPredicates("config");

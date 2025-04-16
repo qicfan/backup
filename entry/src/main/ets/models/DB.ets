@@ -36,6 +36,7 @@ export class DB {
             "    dir_rule         TEXT,\n" +
             "    low_battery_stop INTEGER    DEFAULT (1),\n" +
             "    only_wifi_backup INTEGER    DEFAULT (1),\n" +
+            "    auto INTEGER    DEFAULT (1),\n" +
             "    created_at       INTEGER,\n" +
             "    updated_at       INTEGER\n" +
             ");\n"
@@ -68,7 +69,7 @@ export class DB {
             "    created_at INTEGER,\n" +
             "    uploaded_at INTEGER\n" +
             ");";
-          const configIniSql = "INSERT INTO config VALUES (1, '', 'yyyy/mm/dd', 1, 1, 0, 0)";
+          const configIniSql = "INSERT INTO config VALUES (1, '', 'yyyy/mm/dd', 1, 1, 2, 0, 0)";
           try {
             store.executeSql(CREATE_CONFIG_TABLE);
             console.log("config table created.")

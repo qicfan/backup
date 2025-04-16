@@ -1,9 +1,11 @@
-import { IBestButton, IBestNotify } from "@ibestservices/ibest-ui-v2";
+import { IBestButton, IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
 import { ServerConfig } from "../models/Server";
 import { AppStorageV2 } from "@kit.ArkUI";
 import { abilityAccessCtrl, common, WantAgent, wantAgent } from "@kit.AbilityKit";
 import { Global } from "../models/Global";
-import { AccessStatus, ConfigGlobalStatus, LoginStatus, LowBatteryStop, OnlyWIFIBackup, TaskDoing } from "../typing";
+import { AccessStatus,
+  AUTOBackup,
+  ConfigGlobalStatus, LoginStatus, LowBatteryStop, OnlyWIFIBackup, TaskDoing } from "../typing";
 import { Config } from "../models/Config";
 import { Settings } from "../components/Settings";
 import { Login } from "../components/Login";
@@ -14,7 +16,7 @@ import { Task } from "../models/Task";
 import { backgroundTaskManager } from "@kit.BackgroundTasksKit";
 import { notificationManager } from "@kit.NotificationKit";
 import { TaskItem } from "../models/TaskItem";
-import { checkPermissionGrant } from "../utils/permission";
+import { checkPermissions } from "../utils/permission";
 import { getBatteryLevel, getCurrentNetType } from "../utils/tool";
 import { connection } from "@kit.NetworkKit";
 
@@ -27,15 +29,18 @@ struct Index {
   @Local global: Global = AppStorageV2.connect(Global, "global", () => new Global())!;
   private ctxUIAbility: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack()
+  @Local creatingTask: boolean = false;
   private stop: boolean = false; // 是否停止执行
   private jobId: number = 0;
-  @Local creatingTask: boolean = false;
+  private init: boolean = true;
+
 
   aboutToAppear() {
     this.server.queryAsset().then((exists: boolean) => {
       if (!exists) {
+        this.init = false;
         // 沒有添加服務器，彈出添加窗口
-        return this.pageInfos.replacePath({ name: "login" })
+        return this.pageInfos.pushPath({ name: "login" })
       } else {
         this.global.loginStatus = LoginStatus.NO_LOGIN;
         // 检查服务器是否可用
@@ -44,22 +49,26 @@ struct Index {
           if (rs) {
             this.global.loginStatus = LoginStatus.LOGIN;
           } else {
+            this.init = false;
             // 登录失败，重新登录
-            return this.pageInfos.replacePath({ name: "login" })
+            return this.pageInfos.pushPath({ name: "login" })
           }
         })
       }
       this.config.init().then((exists: number) => {
         if (exists != 1) {
-          return this.pageInfos.replacePath({ name: "Settings" })
+          this.init = false;
+          return this.pageInfos.pushPath({ name: "Settings" })
         } else {
           this.global.configGlobalStatus = ConfigGlobalStatus.YES
         }
       }).catch(() => {
-        return this.pageInfos.replacePath({ name: "Settings" })
+        this.init = false;
+        return this.pageInfos.pushPath({ name: "Settings" })
       })
     }).catch(() => {
-      return this.pageInfos.replacePath({ name: "login" })
+      this.init = false;
+      return this.pageInfos.pushPath({ name: "login" })
     })
     // 等开始收集相册内的新内容并生成任务
     emitter.on(Global.START_COLLECT_PHOTO_EVENT, () => {
@@ -88,11 +97,13 @@ struct Index {
     }, 3000)
   }
 
+  onPageHide(): void {
+  }
+
   checkPerm(): Promise<boolean> {
     return new Promise((resolve) => {
-      checkPermissionGrant('ohos.permission.READ_IMAGEVIDEO').then((s) => {
-        if (s === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
-          // 已授权
+      checkPermissions(this.ctxUIAbility, 'ohos.permission.READ_IMAGEVIDEO').then((rs) => {
+        if (rs) {
           this.global.AccessStatus = AccessStatus.YES;
           resolve(true)
         } else {
@@ -102,11 +113,10 @@ struct Index {
             duration: 3000
           })
           this.global.AccessStatus = AccessStatus.NO;
-          resolve(false)
+          resolve(false);
         }
       })
     })
-
   }
 
   checkBattery() {
@@ -152,8 +162,8 @@ struct Index {
     if (!(await this.checkWifi())) {
       return false;
     }
-    if (this.config.backupRootPath === "") {
-      IBestNotify.show({
+    if (!this.config.backupRootPath) {
+      IBestToast.show({
         message: "请先设置备份路径",
         type: "warning",
         duration: 3000
@@ -169,6 +179,9 @@ struct Index {
 
   // 是否开源收集照片并生成任务
   async canCreateTask(): Promise<boolean> {
+    if (!this.init) {
+      return false;
+    }
     // 检查是否授权读取相册
     if (!(await this.checkPerm())) {
       return false;
@@ -182,7 +195,7 @@ struct Index {
 
   // 开始任务
   async startTask(taskId?: number): Promise<boolean> {
-    if (!this.canStart()) {
+    if (!(await this.canStart())) {
       return false;
     }
     if (this.global.processId > 0) {
@@ -225,12 +238,12 @@ struct Index {
     await task.finish();
     // 取消长时任务
     backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
+    // 触发UI刷新
+    emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
   }
 
-
-
   async startCreateTask(): Promise<boolean> {
-    if (!this.canCreateTask()) {
+    if (!(await this.canCreateTask())) {
       return false;
     }
     console.log("准备生成新任务")
@@ -240,14 +253,16 @@ struct Index {
       duration: 500000
     })
     try {
-      await Task.createTask(getContext(this))
+      await Task.createTask(getContext(this), this.config)
     } catch (e) {
 
     } finally {
       setTimeout(() => {
         IBestNotify.close();
-        // 触发任务执行
-        emitter.emit(Global.START_WAIT_TASK_EVENT);
+        if (this.config.auto === AUTOBackup.YES) {
+          // 触发任务执行
+          emitter.emit(Global.START_WAIT_TASK_EVENT);
+        }
       }, 1000)
     }
     return true;
@@ -448,5 +463,16 @@ struct Index {
     .backgroundColor($r('app.color.ibest_background'))
     .width('100%')
     .height('100%')
+    .onNavBarStateChange(isVisible => {
+      if (isVisible) {
+        // 检查是否配置了备份路径
+        if (this.config.backupRootPath !== "") {
+          this.init = true;
+          setTimeout(() => {
+            emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
+          }, 3000)
+        }
+      }
+    })
   }
 }

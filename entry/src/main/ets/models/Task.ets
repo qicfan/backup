@@ -1,12 +1,11 @@
-import { TaskDoing, TaskItemStatus, TaskStatus, TaskType } from "../typing";
+import { BackupType, TaskItemStatus, TaskStatus, TaskType } from "../typing";
 import { DB } from "./DB";
 import { relationalStore } from "@kit.ArkData";
 import { BusinessError, emitter } from "@kit.BasicServicesKit";
 import { Global } from "./Global";
 import { Photos } from "../utils/photos";
 import { TaskItem } from "./TaskItem";
-import { checkPermissions } from "../utils/permission";
-import { common } from "@kit.AbilityKit";
+import { Config } from "./Config";
 
 /**
  * 备份任务
@@ -140,7 +139,7 @@ export class Task {
     try {
       const rowId =
         await DB.dbInstance?.store?.insert('task', insertBucket);
-      console.info(`task Insert row: ${rowId}`);
+      // console.info(`task Insert row: ${rowId}`);
     } catch (err) {
       console.error(`task Insert failed, code is ${err.code},message is ${err.message}`);
     }
@@ -248,11 +247,13 @@ export class Task {
    * 收集相册照片信息，决定是否创建任务
    *
    */
-  static async createTask(ctx: Context, type = TaskType.AUTO) {
-    // 先检查授权
-    await checkPermissions(ctx as common.UIAbilityContext, 'ohos.permission.READ_IMAGEVIDEO')
+  static async createTask(ctx: Context, config: Config) {
     let lastId: number = 0;
     let lastTimestamp: number = 0;
+    if (config.backupType === BackupType.NEW) {
+      // 只备份新数据
+      lastTimestamp = Math.floor(Date.now() / 1000)
+    }
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.orderByDesc('id').limitAs(1)
     const rs = await DB.dbInstance?.store?.query(predicates)
@@ -273,10 +274,8 @@ export class Task {
     let total = 0;
     let size = 0;
     while (true) {
-      console.log(`查询第 ${page} 页照片数据`);
       // 1. 收集相册内容，并且写入taskitem表
       const items = await Photos.getPhotos(ctx, lastTimestamp, page, pageSize)
-      console.log(`Task 查询到 ${items.length} 条数据`)
       // 写入数据库
       if (items.length === 0) break;
       for (let item of items) {
@@ -292,14 +291,13 @@ export class Task {
     }
     // 2. 写入task表
     if (total === 0) {
-      console.log("总共0条，啥也不干")
       // 没有新照片，什么也不用干
       emitter.emit(Global.COLLECT_PHOTO_FINISH_EVENT, { data: {exists: false}})
       return ;
     }
     const task = new Task();
     task.id = lastId;
-    task.type = type;
+    task.type = TaskType.AUTO;
     task.size = size;
     task.uploadedSize = 0;
     task.total = total;
