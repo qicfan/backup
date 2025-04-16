@@ -35,16 +35,15 @@ export struct TaskItem {
 
   updateTask(id: number) {
     if (id && id === this.task.id) {
-      this.doing = true;
       this.task.fetch().then(() => {
         // console.log("开始更新任务" + data?.data?.id +
         //   `的UI状态, status=${this.task.status}, 已上传字节: ${this.task.uploadedSize}， 总字节：${this.task.size}, 进度: ${this.process}`)
-        if (this.task.status === TaskStatus.FINISH) {
+        if (this.task.status === TaskStatus.PROCESS) {
+          this.doing = true;
+        } else {
           this.doing = false;
         }
       })
-    } else {
-      this.doing = false;
     }
   }
 
@@ -55,6 +54,7 @@ export struct TaskItem {
 
   stopTask() {
     console.log("发送暂停任务通知：" + this.task.id)
+    this.doing = false;
     emitter.emit(Global.STOP_TASK_EVENT, { data: {id: this.task.id }});
   }
 

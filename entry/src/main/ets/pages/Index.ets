@@ -1,7 +1,7 @@
 import { IBestButton, IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
 import { ServerConfig } from "../models/Server";
 import { AppStorageV2 } from "@kit.ArkUI";
-import { abilityAccessCtrl, common, WantAgent, wantAgent } from "@kit.AbilityKit";
+import { common, WantAgent, wantAgent } from "@kit.AbilityKit";
 import { Global } from "../models/Global";
 import { AccessStatus,
   AUTOBackup,
@@ -30,6 +30,7 @@ struct Index {
   private ctxUIAbility: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack()
   @Local creatingTask: boolean = false;
+  @Local loadingText: string = "开始备份"
   private stop: boolean = false; // 是否停止执行
   private jobId: number = 0;
   private init: boolean = true;
@@ -152,14 +153,17 @@ struct Index {
   async canStart(): Promise<boolean> {
     // 检查是否授权读取相册
     if (!(await this.checkPerm())) {
+      console.error(`没有授权相册，无法执行任务`);
       return false;
     }
     // 如果打开了低电量暂停任务，则检查电量
     if (!this.checkBattery()) {
+      console.error(`电量不足15%，无法执行任务`);
       return false;
     }
     // 如果打开了仅WIFI备份，则检查网络状态
     if (!(await this.checkWifi())) {
+      console.error(`非WIFI，无法执行任务`);
       return false;
     }
     if (!this.config.backupRootPath) {
@@ -172,6 +176,7 @@ struct Index {
     }
     // 如果已经触发了停止，则不会开始执行新任务
     if (this.stop) {
+      console.error(`stop=true，被其他操作中止，无法执行任务`);
       return false;
     }
     return true;
@@ -246,17 +251,20 @@ struct Index {
     if (!(await this.canCreateTask())) {
       return false;
     }
-    console.log("准备生成新任务")
-    IBestNotify.show({
-      message: "正在扫描新照片并生成备份任务...",
-      type: "warning",
-      duration: 500000
+    animateTo({duration: 1000, curve: Curve.EaseIn }, () => {
+      this.creatingTask = true;
+      this.loadingText = "正在扫描新照片并生成备份任务...";
     })
+
     try {
       await Task.createTask(getContext(this), this.config)
     } catch (e) {
 
     } finally {
+      animateTo({duration: 1000, curve: Curve.EaseIn }, () => {
+        this.creatingTask = false;
+        this.loadingText = "开始备份";
+      })
       setTimeout(() => {
         IBestNotify.close();
         if (this.config.auto === AUTOBackup.YES) {
@@ -306,6 +314,7 @@ struct Index {
               let pageSize = 100;
               const updateProgressHandleId = setTimeout(() => {
                 if (this.jobId <= 0) {
+                  console.log("任务已结束，清除定时更新")
                   clearTimeout(updateProgressHandleId);
                   return ;
                 }
@@ -347,7 +356,8 @@ struct Index {
                     emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
                   }
                 }
-                if (curTotal >= pageSize && !this.stop) {
+                if (this.stop) break;
+                if (curTotal >= pageSize) {
                   page++;
                   continue;
                 }
@@ -363,6 +373,7 @@ struct Index {
                 }, 1000)
                 break;
               }
+              this.stop = false;
             })
             .catch((error: BusinessError) => {
               console.error(`启动长时任务失败. code is ${error.code} message is ${error.message}`);
@@ -437,9 +448,9 @@ struct Index {
         Column() {
           IBestButton({
             text: '开始备份',
-            type: (this.global.taskGlobalStatus == TaskDoing.YES) ? 'default' : 'primary',
-            loadingText: "操作中...",
-            loading: this.global.taskGlobalStatus == TaskDoing.YES
+            type: this.creatingTask ? 'default' : 'primary',
+            loadingText: this.loadingText,
+            loading: this.creatingTask
           })
             .onClick(() => {
               this.global.taskGlobalStatus = TaskDoing.YES;
@@ -470,7 +481,7 @@ struct Index {
           this.init = true;
           setTimeout(() => {
             emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
-          }, 3000)
+          }, 500)
         }
       }
     })
