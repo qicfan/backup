@@ -2,15 +2,35 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "使用webdav协议将相册被分到NASn"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "使用webdav协议将相册被分到NAS"
     },
     {
       "name": "EntryAbility_label",
-      "value": "label"
+      "value": "相册备份"
+    },
+    {
+      "name": "internet_reason",
+      "value": "用于将用户相册备份到NAS"
+    },
+    {
+      "name": "IMAGEVIDEO_reason",
+      "value": "读取相册内容并备份到NAS"
+    },
+    {
+      "name": "PERSISTENT_reason",
+      "value": "应用卸载时删除服务器登录账号登"
+    },
+    {
+      "name": "BACKGROUND_reason",
+      "value": "后台执行备份任务"
+    },
+    {
+      "name": "NETWORK_reason",
+      "value": "查询是否处于WIFI环境下"
     }
   ]
 }
