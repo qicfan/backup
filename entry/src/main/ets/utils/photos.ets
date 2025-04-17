@@ -3,6 +3,7 @@ import { dataSharePredicates } from "@kit.ArkData";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { TaskItem } from "../models/TaskItem";
+import { image } from "@kit.ImageKit";
 
 export class Photos {
   /**
@@ -26,7 +27,6 @@ export class Photos {
       if (fetchRs.getCount() <= 0) {
         return items;
       }
-      console.log("Photos 查询到 " + fetchRs.getCount() + " 条数据")
     } catch (e) {
       let err = e as BusinessError
       console.log(`查询照片失败，code=${err.code}, msg=${err.message}`)
@@ -61,8 +61,51 @@ export class Photos {
     return items;
   }
 
+  // 通过uri获取PhotoAsset做进一步的展示
+  static async getPhotoAssetByUri(ctx: Context, uri: string): Promise<photoAccessHelper.PhotoAsset | undefined> {
+    return new Promise(async (resolve, reject) => {
+      let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
+      predicates.equalTo('uri', uri);
+      let fetchOptions: photoAccessHelper.FetchOptions = {
+        fetchColumns: [],
+        predicates: predicates
+      };
+      let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx);
+      let assetResult: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> = await phAccessHelper.getAssets(fetchOptions);
+      if (!assetResult || assetResult.getCount() <= 0) {
+        resolve(undefined)
+        return;
+      }
+      let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
+      resolve(asset);
+    });
+  }
+
+  // 获取图片的内容
+  static async getPixelMapByAsset(ctx: Context, asset: photoAccessHelper.PhotoAsset | undefined): Promise<image.PixelMap | undefined> {
+    return new Promise(async (resolve, reject) => {
+      if (!asset) {
+        resolve(undefined);
+        return;
+      }
+      const requestOptions: photoAccessHelper.RequestOptions = {
+        deliveryMode: photoAccessHelper.DeliveryMode.FAST_MODE,
+      }
+      try {
+        let requestId: string = await photoAccessHelper.MediaAssetManager.requestImage(ctx, asset, requestOptions, {
+          onDataPrepared: (imgSource: image.ImageSource) => {
+            imgSource.createPixelMap().then((pm) => resolve(pm)).catch((err: BusinessError) => reject(err))
+          }
+        });
+      } catch (err) {
+        console.error(`failed to request moving photo, error code is ${err.code}, message is ${err.message}`);
+        reject(err)
+      }
+    });
+  }
+
   // 将动态图片的图片和视频保存到本地沙箱文件
-  static async saveMovingPhoto(ctx: Context, uri: string, imageUri: string, videoUri: string): Promise<boolean> {
+  static async saveMovingPhoto(ctx: Context, uri: string, imageUri: string, videoUri: string): Promise<string> {
     return new Promise(async (resolve, reject) => {
       let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
       predicates.equalTo(photoAccessHelper.PhotoKeys.PHOTO_SUBTYPE, photoAccessHelper.PhotoSubtype.MOVING_PHOTO).and().equalTo('uri', uri);
@@ -72,7 +115,12 @@ export class Photos {
       };
       let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx);
       let assetResult: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> = await phAccessHelper.getAssets(fetchOptions);
+      if (!assetResult || assetResult.getCount() <= 0) {
+        resolve("无法查询到图片数据")
+        return;
+      }
       let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
+
       let requestOptions: photoAccessHelper.RequestOptions = {
         deliveryMode: photoAccessHelper.DeliveryMode.HIGH_QUALITY_MODE,
       }
@@ -82,13 +130,11 @@ export class Photos {
           onDataPrepared: (movingPhoto: photoAccessHelper.MovingPhoto) => {
             if (movingPhoto === undefined) {
               console.error('Error occurred when preparing data');
-              resolve(false)
-              return;
+              resolve("读取动态图片数据出错，请检查该图片是否存在或重试")
             }
-            console.info("moving photo acquired successfully, uri: " + movingPhoto.getUri());
             console.info(`读取动态图片${uri}，图片：${movingPhoto.getUri()}=>${imageUri}, 视频:${videoUri}`)
             movingPhoto.requestContent(imageUri, videoUri).then(() => {
-              resolve(true)
+              resolve("success")
             }).catch((err: BusinessError) => {
               console.error(`动态图片保存失败, error code is ${err.code}, message is ${err.message}`);
               reject(err)

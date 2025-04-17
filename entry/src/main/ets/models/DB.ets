@@ -59,6 +59,7 @@ export class DB {
             "    uri    TEXT (1024),\n" +
             "    file_uri    TEXT (1024),\n" +
             "    remote_uri  TEXT (512),\n" +
+            "    failed_reason  TEXT (512),\n" +
             "    photo_type     INTEGER,\n" +
             "    sub_type     INTEGER,\n" +
             "    size     INTEGER,\n" +

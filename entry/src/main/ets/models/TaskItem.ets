@@ -4,12 +4,13 @@ import { intl } from '@kit.LocalizationKit';
 import { relationalStore } from "@kit.ArkData";
 import { DB } from "./DB";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
-import { copyPhoto, splitFileExt } from "../utils/tools";
+import { copyPhoto, deletePhoto, splitFileExt } from "../utils/tools";
 import { WebDav } from "../utils/webdav";
 import { Config } from "./Config";
 import { Task } from "./Task";
 import { Photos } from "../utils/photos";
 
+@ObservedV2
 export class TaskItem {
   id: number = 0;
   taskId: number = 0;
@@ -23,7 +24,8 @@ export class TaskItem {
   remoteUri: string = "";
   photoType: photoAccessHelper.PhotoType = photoAccessHelper.PhotoType.IMAGE;
   subType: photoAccessHelper.PhotoSubtype = photoAccessHelper.PhotoSubtype.DEFAULT
-  status: TaskItemStatus = TaskItemStatus.WAIT;
+  @Trace status: TaskItemStatus = TaskItemStatus.WAIT;
+  @Trace failedReason: string = '';
   createdAt: number = 0;
   uploadedAt: number = 0;
 
@@ -72,6 +74,7 @@ export class TaskItem {
     taskItem.uri = rs.getString(rs.getColumnIndex('uri'))
     taskItem.fileUri = rs.getString(rs.getColumnIndex('file_uri'))
     taskItem.remoteUri = rs.getString(rs.getColumnIndex('remote_uri'))
+    taskItem.failedReason = rs.getString(rs.getColumnIndex('failed_reason'))
     taskItem.size = rs.getLong(rs.getColumnIndex('size'))
     taskItem.uploadedSize = rs.getLong(rs.getColumnIndex('uploaded_size'))
     taskItem.photoType = rs.getLong(rs.getColumnIndex('photo_type'))
@@ -84,6 +87,15 @@ export class TaskItem {
     return taskItem;
   }
 
+  static getById(itemId: number) {
+
+  }
+
+  async start() {
+    this.status = TaskItemStatus.UPLOADING;
+    this.updateStatus();
+  }
+
   // 将状态修改为执行中
   async success() {
     this.status = TaskItemStatus.SUCCESS;
@@ -91,14 +103,18 @@ export class TaskItem {
     this.updateStatus();
   }
 
-  async failed() {
+  async failed(reason?: string) {
     this.status = TaskItemStatus.FAIL;
+    if (reason) {
+      this.failedReason = reason;
+    }
     await this.updateStatus();
   }
 
   async updateStatus() {
     const updateBucket: relationalStore.ValuesBucket = {
       "status": this.status,
+      "failed_reason": this.failedReason,
       "uploaded_at": this.uploadedAt
     };
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
@@ -133,6 +149,7 @@ export class TaskItem {
       "uploaded_size": this.uploadedSize,
       "file_uri": this.fileUri,
       "remote_uri": this.remoteUri,
+      "failed_reason": this.failedReason,
       "photo_type": this.photoType,
       "sub_type": this.subType,
       "status": this.status,
@@ -159,16 +176,17 @@ export class TaskItem {
   // 4. 上传文件
   // 5. 修改状态
   async upload(ctx: Context): Promise<boolean> {
-    if (this.status !== TaskItemStatus.WAIT) return true;
+    if (this.status == TaskItemStatus.SUCCESS || this.status == TaskItemStatus.UPLOADING) return true;
+    await this.start();
     const dirList: string[] = this.remoteUri.split('/').filter(part => part.length > 0);
     dirList.pop();
     const remoteUri = `${this.config.backupRootPath}${this.remoteUri}`
     // 检查文件是否存在
     const exists = await this.webdav.exists(remoteUri);
     if (exists) {
-      this.updateUploadedSize(this.size)
-      this.task.updateUploadedSize(this.size);
-      this.success();
+      await this.updateUploadedSize(this.size)
+      await this.task.updateUploadedSize(this.size);
+      await this.success();
       return true;
     }
     let currentPath = `${this.config.backupRootPath}`;
@@ -179,7 +197,7 @@ export class TaskItem {
       if ((rr.statusCode >= 200 && rr.statusCode < 300) || rr.statusCode == 405) {
         continue
       } else {
-        this.failed();
+        await this.failed("在服务器上创建目录"+currentPath+"失败");
         // 创建目录失败
         console.log(`创建目录失败：${currentPath}`);
         return false;
@@ -194,21 +212,49 @@ export class TaskItem {
         this.videoUri = this.fileUri.replace(this.name, videoName);
         this.videoRemoteUri = this.remoteUri.replace(this.name, videoName);
         const rs = await Photos.saveMovingPhoto(ctx, this.uri, this.fileUri, this.videoUri)
-        if (!rs) {
+        if (rs !== 'success') {
           // 保存动态图片失败
+          await this.failed(`无法保存动态图片${this.name}，原因：${rs}`);
           return false;
         }
         let a = await this.webdav.upload(this);
+        if (a !== "success") {
+          // 失败了
+          this.failed(a);
+          // deletePhoto(this.fileUri);
+          return false;
+        }
         let b = await this.webdav.upload(this, 'video');
-        return a && b;
+        if (b !== 'success') {
+          // 失败了
+          this.failed(b)
+          // deletePhoto(this.videoUri);
+          return false;
+        }
+        await this.success();
+        // 删除文件
+        // deletePhoto(this.fileUri);
+        // deletePhoto(this.videoUri);
+        return true;
       } else {
         copyPhoto(this.uri, this.size, this.fileUri);
         // 上传文件
-        return await this.webdav.upload(this);
+        const rs = await this.webdav.upload(this);
+        console.log(`上传结果：${rs}`)
+        if (rs != "success") {
+          await this.failed(rs);
+        } else {
+          await this.success()
+        }
+        // deletePhoto(this.fileUri);
+        return rs === 'success'
       }
 
     } catch (e) {
       console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
+      this.failed(e.message)
+      // deletePhoto(this.fileUri);
+      // deletePhoto(this.videoUri);
       return false;
     }
   }

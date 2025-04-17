@@ -6,6 +6,8 @@ import { Global } from "../models/Global";
 
 @ComponentV2
 export struct TaskList {
+  @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack()
+
   @Local list: Task[] = [];
 
   private page: number = 1;
@@ -15,7 +17,6 @@ export struct TaskList {
     // 查询任务列表
     this.getList('pull');
     emitter.on(Global.COLLECT_PHOTO_FINISH_EVENT, (data) => {
-      console.log(`收集完了照片信息，是否存在新数据：${data.data?.exists}`)
       // 重新载入列表
       if (data.data?.exists) {
         this.getList('pull');
@@ -64,6 +65,9 @@ export struct TaskList {
       List() {
         ForEach(this.list, (item: Task) => {
           TaskItem({task: item})
+            .onClick(() => {
+              this.pageInfos.pushPath({name: "TaskFiles", param: item.id})
+            })
         }, (item: Task) => item.id + '')
       }
       .width('100%')

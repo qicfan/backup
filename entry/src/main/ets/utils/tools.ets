@@ -40,7 +40,15 @@ export function copyPhoto(uri: string, size: number, destFilePath: string) {
 
 
 export function deletePhoto(filePath: string) {
-  return fileIo.unlinkSync(filePath)
+  if (!filePath) {
+    return;
+  }
+  try {
+    fileIo.unlinkSync(filePath)
+  } catch (e) {
+    console.error(`删除文件错误，code:${e.code}, 错误信息：${e.message}`)
+  }
+  return
 }
 
 export function splitFileExt(filePath: string): string[] {
@@ -123,4 +131,21 @@ export function getBatteryLevel(): number {
     console.error('获取电量失败:', (error as BusinessError).message);
     return -1; // 返回-1表示获取失败
   }
+}
+
+export function formatFileSize(size: number): string {
+  if (size < 1024 * 1024) {
+    // KB
+    return (size / 1024).toFixed(2) + 'KB'
+  }
+  if (size >= 1024 * 1024 && size < 1024 * 1024 * 1024) {
+    // MB
+    return (size / 1024 / 1024).toFixed(2) + 'MB'
+  }
+  if (size >= 1024 * 1024 * 1024 && size < 1024 * 1024 * 1024 * 1024) {
+    // GB
+    return (size / 1024 / 1024 / 1024).toFixed(2) + 'GB'
+  }
+  // PB
+  return (size / 1024 / 1024 / 1024 / 1024).toFixed(2) + 'PB'
 }

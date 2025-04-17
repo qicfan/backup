@@ -60,7 +60,6 @@ export class Task {
     this.updateStatus();
   }
 
-
   // 将状态修改为执行中
   async start() {
     this.status = TaskStatus.PROCESS;
@@ -146,12 +145,11 @@ export class Task {
   }
 
   // 查询任务详情
-  async getWaitItems(page:number = 1, pageSize:number = 100) {
+  async getFailItems(page:number = 1, pageSize:number = 100) {
     const items: TaskItem[] = [];
     const offset = (page - 1) * pageSize;
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
-    // predicates.equalTo("task_id", this.id).limitAs(pageSize).offsetAs(offset)
-    predicates.equalTo("task_id", this.id).and().in("status", [TaskItemStatus.WAIT, TaskItemStatus.FAIL]).limitAs(pageSize).offsetAs(offset)
+    predicates.equalTo("task_id", this.id).and().in("status", [TaskItemStatus.FAIL]).limitAs(pageSize).offsetAs(offset)
     try {
       const rs = await DB.dbInstance?.store?.query(predicates);
       if (rs === undefined) {
@@ -172,6 +170,60 @@ export class Task {
       let err = error as BusinessError;
       console.log(`${err.code} => ${err.message}`)
       return [];
+    }
+  }
+
+  // 查询任务详情
+  async getWaitItems(page:number = 1, pageSize:number = 100) {
+    const items: TaskItem[] = [];
+    const offset = (page - 1) * pageSize;
+    let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
+    // predicates.equalTo("task_id", this.id).limitAs(pageSize).offsetAs(offset)
+    predicates.equalTo("task_id", this.id).and().equalTo("status", TaskItemStatus.WAIT).limitAs(pageSize).offsetAs(offset).orderByAsc('id')
+    try {
+      const rs = await DB.dbInstance?.store?.query(predicates);
+      if (rs === undefined) {
+        return [];
+      }
+      console.log(`task ${this.id}查询到 ${rs?.rowCount}条 item`)
+      if ( rs.rowCount <= 0) {
+        return [];
+      }
+      while (rs.goToNextRow()) {
+        const taskItem = TaskItem.getInstance(rs);
+        taskItem.task = this;
+        items.push(taskItem)
+      }
+      rs.close();
+      return items
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+      return [];
+    }
+  }
+
+  // 查询任务详情
+  async getProcessItems() {
+    let item: TaskItem | undefined = undefined;
+    let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
+    // predicates.equalTo("task_id", this.id).limitAs(pageSize).offsetAs(offset)
+    predicates.equalTo("task_id", this.id).and().equalTo("status", TaskItemStatus.UPLOADING).limitAs(1).orderByAsc('id')
+    try {
+      const rs = await DB.dbInstance?.store?.query(predicates);
+      if (rs === undefined || rs.rowCount <= 0) {
+        return item;
+      }
+      while (rs.goToNextRow()) {
+        item = TaskItem.getInstance(rs);
+        item.task = this;
+      }
+      rs.close();
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+    } finally {
+      return item;
     }
   }
 
@@ -243,6 +295,26 @@ export class Task {
     return ;
   }
 
+  // 修复意外退出导致的任务状态错误
+  static async repair(processTaskId: number): Promise<boolean> {
+    if (processTaskId > 0) {
+      return true;
+    }
+    // 更新所有运行中的任务为待运行
+    const updateBucket: relationalStore.ValuesBucket = {
+      "status": TaskStatus.WAIT,
+      "updated_at": Math.floor(Date.now() / 1000)
+    };
+    let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
+    predicates.equalTo("status", TaskStatus.PROCESS)
+    try {
+      await DB.dbInstance?.store?.update(updateBucket, predicates);
+    } catch (err) {
+      console.error(`修正运行中的任务状态失败, code is ${err.code},message is ${err.message}`);
+    }
+    return false;
+  }
+
   /**
    * 收集相册照片信息，决定是否创建任务
    *
@@ -257,7 +329,6 @@ export class Task {
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.orderByDesc('id').limitAs(1)
     const rs = await DB.dbInstance?.store?.query(predicates)
-    console.log("任务数量: " + rs?.rowCount);
     if (rs === undefined || rs.rowCount <= 0) {
       lastId = 1;
     } else {
@@ -268,7 +339,6 @@ export class Task {
       }
     }
     rs?.close();
-    console.log(`lastId: ${lastId}, lastTimestamp: ${lastTimestamp}`);
     let page = 1;
     const pageSize = 100;
     let total = 0;

@@ -166,7 +166,7 @@ export class WebDav {
     return await this.request(req);
   }
 
-  async upload(taskItem: TaskItem, type: string = "default"): Promise<boolean> {
+  async upload(taskItem: TaskItem, type: string = "default"): Promise<string> {
     // 读取文件
     let uploadFile: fileIo.File;
     let uploadBuffer: ArrayBuffer;
@@ -181,7 +181,7 @@ export class WebDav {
       fileIo.readSync(uploadFile.fd, uploadBuffer);
     } catch (err) {
       console.error(`读取要上传的文件失败. 文件路径：${type === "default" ? taskItem.fileUri : taskItem.videoUri}, Code: ${err.code}, message: ${err.message}`);
-      return false;
+      return "读取要上传的文件失败，请重试"
     }
     const customHttpEventsHandler: rcp.HttpEventsHandler = {
       onUploadProgress: (totalSize: number, transferredSize: number) => {
@@ -207,17 +207,15 @@ export class WebDav {
         taskItem.task.updateUploadedSize(taskItem.size)
       }
       taskItem.success();
-      fileIo.close(uploadFile)
       uploadBuffer = new ArrayBuffer(0);
       deletePhoto(type === "default" ? taskItem.fileUri : taskItem.videoUri);
-      return true;
+      return "success";
     }
     console.error(`Failed to request the upload. Code: ${rr.statusCode}, message: ${rr.message}`);
-    taskItem.failed();
     fileIo.close(uploadFile)
     uploadBuffer = new ArrayBuffer(0);
     deletePhoto(type === "default" ? taskItem.fileUri : taskItem.videoUri)
-    return false;
+    return "上传失败，服务器返回状态: " + rr.statusCode + "，错误信息：" + rr.message;
   }
 
   // 解析dav xml

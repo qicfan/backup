@@ -26,6 +26,7 @@ import { checkPermissions } from "../utils/permission";
 import { getBatteryLevel, getCurrentNetType } from "../utils/tools";
 import { connection } from "@kit.NetworkKit";
 import { PrivacyComponent } from "../components/PrivacyComponent";
+import { TaskFiles } from "../components/TaskFiles";
 
 @Entry
 @ComponentV2
@@ -77,6 +78,8 @@ struct Index {
       this.init = false;
       return this.pageInfos.pushPath({ name: "login" })
     })
+    // 修复意外退出的任务状态
+    Task.repair(this.global.processId).then()
     // 等开始收集相册内的新内容并生成任务
     emitter.on(Global.START_COLLECT_PHOTO_EVENT, () => {
       this.startCreateTask()
@@ -95,16 +98,27 @@ struct Index {
       const taskId: number = data.data?.id;
       this.stopTask(taskId, true)
     })
+
+  }
+
+  async aboutToDisappear() {
+    console.log('app即将退出');
+    if (this.global.processId > 0) {
+      // 有正在运行的任务，结束任务
+      await this.stopTask(this.global.processId)
+    }
   }
 
   onPageShow(): void {
     // 从后台转入前台时触发生成新任务
+    console.log('进入首页')
     setTimeout(() => {
       emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
     }, 3000)
   }
 
   onPageHide(): void {
+    console.log('app切换到后台或者离开首页');
   }
 
   checkPerm(): Promise<boolean> {
@@ -320,7 +334,7 @@ struct Index {
               console.log(`任务 ${task.id} 开始执行...`)
               let page = 1;
               let pageSize = 100;
-              const updateProgressHandleId = setTimeout(() => {
+              const updateProgressHandleId = setInterval(() => {
                 if (this.jobId <= 0) {
                   console.log("任务已结束，清除定时更新")
                   clearTimeout(updateProgressHandleId);
@@ -449,6 +463,8 @@ struct Index {
       Settings()
     } else if (name === "PrivacyComponent") {
       PrivacyComponent()
+    } else if(name == "TaskFiles") {
+      TaskFiles()
     }
 
   }

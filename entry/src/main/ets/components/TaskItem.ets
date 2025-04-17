@@ -36,8 +36,6 @@ export struct TaskItem {
   updateTask(id: number) {
     if (id && id === this.task.id) {
       this.task.fetch().then(() => {
-        // console.log("开始更新任务" + data?.data?.id +
-        //   `的UI状态, status=${this.task.status}, 已上传字节: ${this.task.uploadedSize}， 总字节：${this.task.size}, 进度: ${this.process}`)
         if (this.task.status === TaskStatus.PROCESS) {
           this.doing = true;
         } else {
@@ -49,95 +47,93 @@ export struct TaskItem {
 
   startTask() {
     console.log("发送开始任务通知：" + this.task.id)
-    emitter.emit(Global.START_WAIT_TASK_EVENT, { data: {id: this.task.id }});
+    emitter.emit(Global.START_WAIT_TASK_EVENT, { data: { id: this.task.id } });
   }
 
   stopTask() {
     console.log("发送暂停任务通知：" + this.task.id)
     this.doing = false;
-    emitter.emit(Global.STOP_TASK_EVENT, { data: {id: this.task.id }});
+    emitter.emit(Global.STOP_TASK_EVENT, { data: { id: this.task.id } });
   }
 
   build() {
     Column() {
-      Column() {
-        Flex({
-          direction: FlexDirection.Row,
-          wrap: FlexWrap.NoWrap,
-          justifyContent: FlexAlign.SpaceBetween,
-          alignItems: ItemAlign.Center
-        }) {
-          Column() {
-            Flex({
-              direction: FlexDirection.Row,
-              wrap: FlexWrap.NoWrap,
-              justifyContent: FlexAlign.SpaceBetween,
-              alignItems: ItemAlign.Center
-            }) {
-              if (this.doing) {
-                IBestLoading({ loadingSize: 18 })
-              }
-              Text(this.statusName)
-                .textAlign(TextAlign.Start)
-              Text(dateTimeFromTimestamp(this.task.createdAt))
-                .textAlign(TextAlign.End)
+      Flex({
+        direction: FlexDirection.Row,
+        wrap: FlexWrap.NoWrap,
+        justifyContent: FlexAlign.SpaceBetween,
+        alignItems: ItemAlign.Center
+      }) {
+        Column() {
+          Flex({
+            direction: FlexDirection.Row,
+            wrap: FlexWrap.NoWrap,
+            justifyContent: FlexAlign.SpaceBetween,
+            alignItems: ItemAlign.Center
+          }) {
+            if (this.doing) {
+              IBestLoading({ loadingSize: 18 })
             }
-            .width('100%')
-
-            Text(`总计${this.task.total}张，成功${this.task.success}，失败${this.task.failed}`)
-              .width('100%')
+            Text(this.statusName)
               .textAlign(TextAlign.Start)
-              .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
-              .fontColor($r("app.color.ibest_field_prefix_font_color"))
-            if (this.task.status !== TaskStatus.FINISH) {
-              Column() {
-                IBestProgress({
-                  value: this.process
-                })
-              }
-              .padding({ left: $r("app.float.normal_padding") })
-            }
+            Text(dateTimeFromTimestamp(this.task.createdAt))
+              .textAlign(TextAlign.End)
           }
-          .layoutWeight(1)
+          .width('100%')
 
-          Column() {
-            if (this.task.status == TaskStatus.WAIT) {
-              IBestIcon({ name: "play-circle-o", iconSize: 24, color: Color.Blue })
+          Text(`总计${this.task.total}张，成功${this.task.success}，失败${this.task.failed}`)
+            .width('100%')
+            .textAlign(TextAlign.Start)
+            .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+            .fontColor($r("app.color.ibest_field_prefix_font_color"))
+          if (this.task.status !== TaskStatus.FINISH) {
+            Column() {
+              IBestProgress({
+                value: this.process
+              })
             }
-            if (this.task.status == TaskStatus.PROCESS) {
-              IBestIcon({ name: "pause-circle-o", iconSize: 24 })
-            }
-            if (this.task.status == TaskStatus.FINISH) {
-              IBestIcon({ name: "passed", iconSize: 24, color: Color.Green })
-            }
+            .padding({ left: $r("app.float.normal_padding") })
           }
-          .width(24)
-          .alignItems(HorizontalAlign.Center)
-          .justifyContent(FlexAlign.Center)
-          .margin({ left: $r('app.float.inner_padding') })
-          .onClick(() => {
-            if (this.task.status == TaskStatus.WAIT) {
-              this.startTask();
-            }
-            if (this.task.status == TaskStatus.PROCESS) {
-              this.stopTask();
-            }
-          })
         }
-        .padding($r('app.float.normal_padding'))
-        .backgroundColor($r("app.color.ibest_search_inner_background"))
-        .borderRadius(10)
-        .shadow({
-          radius: 8,
-          color: Color.Gray,
-          offsetX: 10,
-          offsetY: 10
+        .layoutWeight(1)
+
+        Column() {
+          if (this.task.status == TaskStatus.WAIT) {
+            IBestIcon({ name: "play-circle-o", iconSize: 24, color: Color.Blue })
+          }
+          if (this.task.status == TaskStatus.PROCESS) {
+            IBestIcon({ name: "pause-circle-o", iconSize: 24 })
+          }
+          if (this.task.status == TaskStatus.FINISH) {
+            IBestIcon({ name: "passed", iconSize: 24, color: Color.Green })
+          }
+        }
+        .width(24)
+        .alignItems(HorizontalAlign.Center)
+        .justifyContent(FlexAlign.Center)
+        .margin({ left: $r('app.float.inner_padding') })
+        .onClick(() => {
+          if (this.task.status == TaskStatus.WAIT) {
+            this.startTask();
+          }
+          if (this.task.status == TaskStatus.PROCESS) {
+            this.stopTask();
+          }
         })
       }
-      .margin({ bottom: $r("app.float.normal_padding") })
-      .backgroundColor($r('app.color.ibest_background'))
-      .width('100%')
-      .padding($r("app.float.normal_padding"))
+      .padding($r('app.float.normal_padding'))
+      .backgroundColor($r("app.color.ibest_search_inner_background"))
+      .borderRadius(10)
+      .shadow({
+        radius: 8,
+        color: Color.Gray,
+        offsetX: 10,
+        offsetY: 10
+      })
     }
+    .margin({ bottom: $r("app.float.normal_padding") })
+    .backgroundColor($r('app.color.ibest_background'))
+    .width('100%')
+    .padding($r("app.float.normal_padding"))
   }
 }

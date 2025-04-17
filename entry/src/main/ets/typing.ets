@@ -11,7 +11,7 @@ export enum TaskType {AUTO = 1, Manual = 2}
 export enum TaskStatus {WAIT = 1, PROCESS = 2, FINISH = 3}
 export enum PhotoType {IMAGE = 1, VIDEO = 2}
 export enum PhotoSubType {DEFAULT = 0, MOVING_PHOTO = 3, BURST = 4}
-export enum TaskItemStatus {WAIT = 1, SUCCESS = 2, FAIL = 3}
+export enum TaskItemStatus {WAIT = 1, SUCCESS = 2, FAIL = 3, UPLOADING = 4}
 export const SERVER_AUTH_FAILED_EVENT = 'server_auth_failed'; // 服务器验证失败
 export interface DavResource {
   href: string
