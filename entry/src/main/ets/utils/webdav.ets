@@ -4,7 +4,7 @@ import { xml, util } from '@kit.ArkTS';
 import { DavResource, SERVER_AUTH_FAILED_EVENT } from "../typing";
 import { emitter } from "@kit.BasicServicesKit";
 import fileIo from "@ohos.file.fs";
-import { deletePhoto } from "./tool";
+import { deletePhoto } from "./tools";
 import { TaskItem } from "../models/TaskItem";
 import { Task } from "../models/Task";
 
@@ -166,42 +166,57 @@ export class WebDav {
     return await this.request(req);
   }
 
-  async upload(taskItem: TaskItem): Promise<boolean> {
+  async upload(taskItem: TaskItem, type: string = "default"): Promise<boolean> {
     // 读取文件
     let uploadFile: fileIo.File;
-    let uploadBuffer: ArrayBuffer = new ArrayBuffer(taskItem.size);
+    let uploadBuffer: ArrayBuffer;
+    if (type === "default") {
+      uploadBuffer = new ArrayBuffer(taskItem.size);
+    } else {
+      const stat = fileIo.statSync(taskItem.videoUri)
+      uploadBuffer = new ArrayBuffer(stat.size);
+    }
     try {
-      uploadFile = fileIo.openSync(taskItem.fileUri, fileIo.OpenMode.READ_ONLY);
+      uploadFile = fileIo.openSync(type === "default" ? taskItem.fileUri : taskItem.videoUri, fileIo.OpenMode.READ_ONLY);
       fileIo.readSync(uploadFile.fd, uploadBuffer);
     } catch (err) {
-      console.error(`读取要上传的文件失败. 文件路径：${taskItem.fileUri}, Code: ${err.code}, message: ${err.message}`);
+      console.error(`读取要上传的文件失败. 文件路径：${type === "default" ? taskItem.fileUri : taskItem.videoUri}, Code: ${err.code}, message: ${err.message}`);
       return false;
     }
     const customHttpEventsHandler: rcp.HttpEventsHandler = {
       onUploadProgress: (totalSize: number, transferredSize: number) => {
-        // console.info("Upload progress:", transferredSize, "of", totalSize);
-        taskItem.updateUploadedSize(transferredSize)
-        taskItem.task.updateUploadedSize(transferredSize)
+        if (type === 'default') {
+          taskItem.updateUploadedSize(transferredSize)
+          taskItem.task.updateUploadedSize(transferredSize)
+        }
       }
     };
-    const url = `${taskItem.config.backupRootPath}/${taskItem.remoteUri}`
+    let url: string;
+    if (type === 'default') {
+      url = `${taskItem.config.backupRootPath}/${taskItem.remoteUri}`
+    } else {
+      url = `${taskItem.config.backupRootPath}/${taskItem.videoRemoteUri}`
+    }
     // console.log(`要上传的文件：${taskItem.fileUri}, 远程路径：${taskItem.remoteUri}, url: ${url}`)
     const req = new rcp.Request(url, "PUT", {}, uploadBuffer, {}, {}, {tracing: {httpEventsHandler: customHttpEventsHandler} });
     const rr = await this.request(req);
     if (rr.success) {
-      console.info("上传成功:" + taskItem.remoteUri + ', ' + rr.statusCode);
-      taskItem.updateUploadedSize(taskItem.size)
-      taskItem.task.updateUploadedSize(taskItem.size)
+      console.info("上传成功:" + (type === "default" ? taskItem.fileUri : taskItem.videoUri) + ', ' + rr.statusCode);
+      if (type === 'default') {
+        taskItem.updateUploadedSize(taskItem.size)
+        taskItem.task.updateUploadedSize(taskItem.size)
+      }
       taskItem.success();
       fileIo.close(uploadFile)
       uploadBuffer = new ArrayBuffer(0);
-      deletePhoto(taskItem.fileUri);
-
+      deletePhoto(type === "default" ? taskItem.fileUri : taskItem.videoUri);
       return true;
     }
     console.error(`Failed to request the upload. Code: ${rr.statusCode}, message: ${rr.message}`);
     taskItem.failed();
-    deletePhoto(taskItem.fileUri)
+    fileIo.close(uploadFile)
+    uploadBuffer = new ArrayBuffer(0);
+    deletePhoto(type === "default" ? taskItem.fileUri : taskItem.videoUri)
     return false;
   }
 

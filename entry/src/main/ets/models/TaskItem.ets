@@ -4,10 +4,11 @@ import { intl } from '@kit.LocalizationKit';
 import { relationalStore } from "@kit.ArkData";
 import { DB } from "./DB";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
-import { copyPhoto } from "../utils/tool";
+import { copyPhoto, splitFileExt } from "../utils/tools";
 import { WebDav } from "../utils/webdav";
 import { Config } from "./Config";
 import { Task } from "./Task";
+import { Photos } from "../utils/photos";
 
 export class TaskItem {
   id: number = 0;
@@ -25,10 +26,13 @@ export class TaskItem {
   status: TaskItemStatus = TaskItemStatus.WAIT;
   createdAt: number = 0;
   uploadedAt: number = 0;
+
   static TABLE_NAME = 'task_items'
   public task: Task = new Task();
   public webdav: WebDav = new WebDav()
   public config: Config = new Config()
+  public videoUri: string = ""
+  public videoRemoteUri: string = ""
 
   updateWebDav(webdav: WebDav, config: Config) {
     this.webdav = webdav;
@@ -138,8 +142,7 @@ export class TaskItem {
       "date_modified": this.dateModified,
     };
     try {
-      const rowId =
-        await DB.dbInstance?.store?.insert(TaskItem.TABLE_NAME, insertBucket,
+      await DB.dbInstance?.store?.insert(TaskItem.TABLE_NAME, insertBucket,
           relationalStore.ConflictResolution.ON_CONFLICT_IGNORE);
       // console.info(`task item insert row: ${rowId}`);
       return true;
@@ -155,7 +158,7 @@ export class TaskItem {
   // 3. 检查文件是否存在，如果存在则检查状态是否完成，如果完成则跳过，如果未完成则删除
   // 4. 上传文件
   // 5. 修改状态
-  async upload(): Promise<boolean> {
+  async upload(ctx: Context): Promise<boolean> {
     if (this.status !== TaskItemStatus.WAIT) return true;
     const dirList: string[] = this.remoteUri.split('/').filter(part => part.length > 0);
     dirList.pop();
@@ -183,12 +186,30 @@ export class TaskItem {
       }
     }
     try {
-      copyPhoto(this.uri, this.size, this.fileUri);
+      // 如果时动态图，则获取图片和视频分别上传
+      if (this.photoType === photoAccessHelper.PhotoType.IMAGE && this.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
+        // 生成视频文件名称
+        const tmpFe = splitFileExt(this.name);
+        const videoName = `${tmpFe[1]}.mp4`;
+        this.videoUri = this.fileUri.replace(this.name, videoName);
+        this.videoRemoteUri = this.remoteUri.replace(this.name, videoName);
+        const rs = await Photos.saveMovingPhoto(ctx, this.uri, this.fileUri, this.videoUri)
+        if (!rs) {
+          // 保存动态图片失败
+          return false;
+        }
+        let a = await this.webdav.upload(this);
+        let b = await this.webdav.upload(this, 'video');
+        return a && b;
+      } else {
+        copyPhoto(this.uri, this.size, this.fileUri);
+        // 上传文件
+        return await this.webdav.upload(this);
+      }
+
     } catch (e) {
       console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
       return false;
     }
-    // 上传文件
-    return await this.webdav.upload(this);
   }
 }

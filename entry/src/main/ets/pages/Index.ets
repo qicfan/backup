@@ -23,7 +23,7 @@ import { backgroundTaskManager } from "@kit.BackgroundTasksKit";
 import { notificationManager } from "@kit.NotificationKit";
 import { TaskItem } from "../models/TaskItem";
 import { checkPermissions } from "../utils/permission";
-import { getBatteryLevel, getCurrentNetType } from "../utils/tool";
+import { getBatteryLevel, getCurrentNetType } from "../utils/tools";
 import { connection } from "@kit.NetworkKit";
 import { PrivacyComponent } from "../components/PrivacyComponent";
 
@@ -351,7 +351,7 @@ struct Index {
                   task.preUploadedSize = task.uploadedSize;
                   item.updateWebDav(this.webdav, this.config)
                   try {
-                    const rs = await item.upload()
+                    const rs = await item.upload(this.ctxUIAbility)
                     if (rs) {
                       task.success++
                     } else {

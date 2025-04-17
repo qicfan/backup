@@ -43,6 +43,16 @@ export function deletePhoto(filePath: string) {
   return fileIo.unlinkSync(filePath)
 }
 
+export function splitFileExt(filePath: string): string[] {
+  const l: string[] = filePath.split('.');
+  let ext: string | undefined = l.pop();
+  if (!ext) {
+    ext = '';
+  }
+  const name = l.join('.')
+  return [ext, name]
+}
+
 export function getMimeTypeFromExtension(filePath: string): string {
   const extension = filePath.split('.').pop()?.toLowerCase() ?? '';
 
