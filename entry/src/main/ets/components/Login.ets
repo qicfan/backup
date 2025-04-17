@@ -67,6 +67,14 @@ export struct Login {
     return
   }
 
+  aboutToAppear(): void {
+    // console.log("登录页面加载")
+  }
+
+  aboutToDisappear(): void {
+    // console.log("登录页面销毁")
+  }
+
   build() {
     NavDestination() {
       Scroll() {
@@ -113,9 +121,10 @@ export struct Login {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.ibest_white'))
-    .hideBackButton(true)
-    .onBackPressed(() => {
-      return false;
+    .hideBackButton(this.pop)
+    .onShown(() => {
+      console.log('登录页面显示')
+      this.pop = this.pageInfos.getParamByIndex(0) as boolean;
     })
   }
 }

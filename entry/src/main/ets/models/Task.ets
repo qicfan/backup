@@ -184,7 +184,7 @@ export class Task {
       if (rs === undefined) {
         return [];
       }
-      console.log(`task list util 查询到 ${rs?.rowCount}条任务`)
+      // console.log(`task list util 查询到 ${rs?.rowCount}条任务`)
       if ( rs.rowCount <= 0) {
         return [];
       }

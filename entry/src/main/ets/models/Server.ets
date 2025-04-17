@@ -41,7 +41,7 @@ export class ServerConfig {
       query.set(asset.Tag.ALIAS, stringToArray(PASSWORD_ALIAS)); // 指定了关键资产别名，最多查询到一条满足条件的关键资产
       query.set(asset.Tag.RETURN_TYPE, asset.ReturnType.ALL); // 此处表示需要返回关键资产的所有信息，即属性+明文
       const res = await asset.query(query);
-      console.log(`查询到 ${res.length} 条关键资产`)
+      // console.log(`查询到 ${res.length} 条关键资产`)
       if (res.length === 0) return false;
       for (let i = 0; i < res.length; i++) {
         let secret: Uint8Array = res[i].get(asset.Tag.SECRET) as Uint8Array;

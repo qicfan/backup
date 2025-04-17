@@ -22,7 +22,7 @@ export struct FolderSelectDialog {
   private deviceName = deviceInfo.marketName;
 
   aboutToAppear() {
-    console.log("folder select dialog open")
+    // console.log("folder select dialog open")
     let path = this.rootPath;
     path = path.replace('/' + this.deviceName + '/', '')
     // 如果为空则设置为/
@@ -34,7 +34,7 @@ export struct FolderSelectDialog {
     this.webdav.getDirs(this.path.join('/')).then((rr) => {
       this.dirList = rr.data;
       this.init = false;
-      console.log(JSON.stringify(this.dirList));
+      // console.log(JSON.stringify(this.dirList));
     }).catch((rr: RequestReturn) => {
       this.init = false;
     })

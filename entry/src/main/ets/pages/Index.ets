@@ -3,9 +3,15 @@ import { ServerConfig } from "../models/Server";
 import { AppStorageV2 } from "@kit.ArkUI";
 import { common, WantAgent, wantAgent } from "@kit.AbilityKit";
 import { Global } from "../models/Global";
-import { AccessStatus,
+import {
+  AccessStatus,
   AUTOBackup,
-  ConfigGlobalStatus, LoginStatus, LowBatteryStop, OnlyWIFIBackup, TaskDoing } from "../typing";
+  ConfigGlobalStatus,
+  LoginStatus,
+  LowBatteryStop,
+  OnlyWIFIBackup,
+  TaskDoing
+} from "../typing";
 import { Config } from "../models/Config";
 import { Settings } from "../components/Settings";
 import { Login } from "../components/Login";
@@ -19,6 +25,7 @@ import { TaskItem } from "../models/TaskItem";
 import { checkPermissions } from "../utils/permission";
 import { getBatteryLevel, getCurrentNetType } from "../utils/tool";
 import { connection } from "@kit.NetworkKit";
+import { PrivacyComponent } from "../components/PrivacyComponent";
 
 @Entry
 @ComponentV2
@@ -34,7 +41,6 @@ struct Index {
   private stop: boolean = false; // 是否停止执行
   private jobId: number = 0;
   private init: boolean = true;
-
 
   aboutToAppear() {
     this.server.queryAsset().then((exists: boolean) => {
@@ -239,7 +245,9 @@ struct Index {
     }
     this.global.processId = 0;
     this.jobId = 0;
-    if (pause) this.stop = true;
+    if (pause) {
+      this.stop = true;
+    }
     await task.finish();
     // 取消长时任务
     backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
@@ -251,7 +259,7 @@ struct Index {
     if (!(await this.canCreateTask())) {
       return false;
     }
-    animateTo({duration: 1000, curve: Curve.EaseIn }, () => {
+    animateTo({ duration: 1000, curve: Curve.EaseIn }, () => {
       this.creatingTask = true;
       this.loadingText = "正在扫描新照片并生成备份任务...";
     })
@@ -261,7 +269,7 @@ struct Index {
     } catch (e) {
 
     } finally {
-      animateTo({duration: 1000, curve: Curve.EaseIn }, () => {
+      animateTo({ duration: 1000, curve: Curve.EaseIn }, () => {
         this.creatingTask = false;
         this.loadingText = "开始备份";
       })
@@ -316,17 +324,19 @@ struct Index {
                 if (this.jobId <= 0) {
                   console.log("任务已结束，清除定时更新")
                   clearTimeout(updateProgressHandleId);
-                  return ;
+                  return;
                 }
                 // 每秒更新一次任务进度
                 this.updateProcess(task);
-                return ;
+                return;
               }, 1000)
               while (true) {
                 let curTotal = 0;
                 const items: TaskItem[] = await task.getWaitItems(page, pageSize)
                 for (let item of items) {
-                  if (this.stop)  break;
+                  if (this.stop) {
+                    break;
+                  }
                   if (!this.checkBattery()) {
                     // 电量低于15%，停止
                     this.stop = true;
@@ -356,7 +366,9 @@ struct Index {
                     emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
                   }
                 }
-                if (this.stop) break;
+                if (this.stop) {
+                  break;
+                }
                 if (curTotal >= pageSize) {
                   page++;
                   continue;
@@ -433,10 +445,12 @@ struct Index {
   PageMap(name: string) {
     if (name === "login") {
       Login()
-    }
-    if (name === "Settings") {
+    } else if (name === "Settings") {
       Settings()
+    } else if (name === "PrivacyComponent") {
+      PrivacyComponent()
     }
+
   }
 
   build() {
@@ -467,8 +481,8 @@ struct Index {
     .menus([
       {
         value: "设置", icon: $r("app.media.gearshape"), action: () => {
-        this.pageInfos.pushPath({ name: "Settings" })
-      }
+          this.pageInfos.pushPath({ name: "Settings" })
+        }
       }
     ])
     .backgroundColor($r('app.color.ibest_background'))

@@ -31,7 +31,7 @@ export struct TaskList {
     }
     try {
       const list = await Task.getList(this.page, this.pageSize);
-      console.log(`tasklist组件查询到 ${list.length}条数据`)
+      // console.log(`tasklist组件查询到 ${list.length}条数据`)
       if (this.page === 1) {
         this.list = list
       } else {

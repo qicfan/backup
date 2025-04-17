@@ -115,11 +115,12 @@ export struct Settings {
   }
 
   aboutToAppear(): void {
+    // console.log("设置页面加载")
     this.backupTypeValue = this.config.backupType == BackupType.ALL ? ['all'] : ['new']
   }
 
-  checkConfig() {
-
+  aboutToDisappear(): void {
+    // console.log("设置页面销毁")
   }
 
   build() {
@@ -177,6 +178,16 @@ export struct Settings {
             }
           })
 
+          Cell({
+            title: "协议和声明",
+            left: "隐私协议",
+            showArrow: true
+          })
+            .onClick(() => {
+              // 跳转到登录页面
+              this.pageInfos.pushPathByName("PrivacyComponent", true);
+            })
+
           About()
 
           // 弹出层
@@ -193,9 +204,6 @@ export struct Settings {
       .height('100%')
     }
     .title("备份规则设置")
-    .onWillDisappear(() => {
-      this.checkConfig()
-    })
     .menus([
       {
         value: "保存",
