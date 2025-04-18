@@ -251,7 +251,6 @@ export class WebDav {
 
   // 根据文件大小来判断是否分块上传
   async uploadTaskItem(taskItem: TaskItem, type: string = "default"): Promise<string> {
-    return "测试上传失败";
     let filePath: string = taskItem.fileUri;
     let size: number = taskItem.size;
     let remoteUri: string = `${taskItem.config.backupRootPath}/${taskItem.remoteUri}`;
