@@ -149,3 +149,13 @@ export function formatFileSize(size: number): string {
   // PB
   return (size / 1024 / 1024 / 1024 / 1024).toFixed(2) + 'PB'
 }
+
+export function fileSize(filePath: string): number {
+  try {
+    const stat = fileIo.statSync(filePath)
+    return stat.size;
+  } catch (e) {
+    return -1;
+  }
+
+}

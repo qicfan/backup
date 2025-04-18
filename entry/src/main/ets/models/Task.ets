@@ -22,9 +22,7 @@ export class Task {
   @Trace status: TaskStatus = TaskStatus.WAIT
   createdAt: number = 0;
   updatedAt: number = 0;
-
   public preUploadedSize = 0;
-
   static TABLE_NAME = 'task'
 
   // 从数据库中查询最新的值
@@ -33,7 +31,9 @@ export class Task {
     predicates.equalTo("id", this.id).limitAs(1)
     try {
       const rs = await DB.dbInstance?.store?.query(predicates);
-      if (!rs || rs.rowCount <= 0) return false
+      if (!rs || rs.rowCount <= 0) {
+        return false
+      }
       while (rs.goToNextRow()) {
         this.type = rs.getLong(rs.getColumnIndex('type'))
         this.size = rs.getLong(rs.getColumnIndex('size'))
@@ -57,21 +57,24 @@ export class Task {
   // 将状态修改为待执行
   async wait() {
     this.status = TaskStatus.WAIT;
-    this.updateStatus();
+    await this.updateStatus();
   }
 
   // 将状态修改为执行中
   async start() {
     this.status = TaskStatus.PROCESS;
-    this.updateStatus();
+    await this.updateStatus();
   }
 
   async finish(): Promise<void> {
-    if ((this.success + this.failed) != this.total ) {
-      return this.wait();
+    await this.fetch();
+    if ((this.success + this.failed) != this.total) {
+      console.log(`状态改为等待，failed: ${this.failed}, success: ${this.success}`)
+      return await this.wait();
     }
     this.status = TaskStatus.FINISH;
-    await this.updateStatus();
+    console.log(`状态改为完成`)
+    return await this.updateStatus();
   }
 
   async updateStatus() {
@@ -89,21 +92,35 @@ export class Task {
     }
   }
 
-  async updateStat(success: number, failed: number) {
-    this.updatedAt = Math.floor(Date.now() / 1000);
-    this.success = success;
-    this.failed = failed;
-    const updateBucket: relationalStore.ValuesBucket = {
-      "success": this.success,
-      "failed": this.failed,
-      "updated_at": this.updatedAt,
-    };
-    let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
-    predicates.equalTo("id", this.id)
+  async updateSuccess(count: number = 1) {
+    let sql: string;
+    if (count > 0) {
+      sql = `UPDATE ${Task.TABLE_NAME} SET success = success + ${count} WHERE id=?`
+    } else {
+      sql = `UPDATE ${Task.TABLE_NAME} SET success = success - ${count} WHERE id=?`
+    }
+    console.log(sql);
     try {
-      await DB.dbInstance?.store?.update(updateBucket, predicates);
+      await DB.dbInstance.store?.executeSql(sql, [this.id]);
+      await this.fetch();
     } catch (err) {
-      console.error(`task statuc update failed, code is ${err.code},message is ${err.message}`);
+      console.error(`更新任务成功计数失败, code is ${err.code},message is ${err.message}`);
+    }
+  }
+
+  async updateFailed(count: number = 1) {
+    let sql: string;
+    if (count > 0) {
+      sql = `UPDATE ${Task.TABLE_NAME} SET failed = failed + ${count} WHERE id=?`
+    } else {
+      sql = `UPDATE ${Task.TABLE_NAME} SET failed = failed - ${count} WHERE id=?`
+    }
+    console.log(sql);
+    try {
+      await DB.dbInstance.store?.executeSql(sql, [this.id]);
+      await this.fetch();
+    } catch (err) {
+      console.error(`更新任务失败计数失败, code is ${err.code},message is ${err.message}`);
     }
   }
 
@@ -145,18 +162,22 @@ export class Task {
   }
 
   // 查询任务详情
-  async getFailItems(page:number = 1, pageSize:number = 100) {
+  async getFailItems(page: number = 1, pageSize: number = 100) {
     const items: TaskItem[] = [];
     const offset = (page - 1) * pageSize;
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
-    predicates.equalTo("task_id", this.id).and().in("status", [TaskItemStatus.FAIL]).limitAs(pageSize).offsetAs(offset)
+    predicates.equalTo("task_id", this.id)
+      .and()
+      .in("status", [TaskItemStatus.FAIL])
+      .limitAs(pageSize)
+      .offsetAs(offset)
     try {
       const rs = await DB.dbInstance?.store?.query(predicates);
       if (rs === undefined) {
         return [];
       }
       console.log(`task ${this.id}查询到 ${rs?.rowCount}条 item`)
-      if ( rs.rowCount <= 0) {
+      if (rs.rowCount <= 0) {
         return [];
       }
       while (rs.goToNextRow()) {
@@ -174,19 +195,24 @@ export class Task {
   }
 
   // 查询任务详情
-  async getWaitItems(page:number = 1, pageSize:number = 100) {
+  async getWaitItems(page: number = 1, pageSize: number = 100) {
     const items: TaskItem[] = [];
     const offset = (page - 1) * pageSize;
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
     // predicates.equalTo("task_id", this.id).limitAs(pageSize).offsetAs(offset)
-    predicates.equalTo("task_id", this.id).and().equalTo("status", TaskItemStatus.WAIT).limitAs(pageSize).offsetAs(offset).orderByAsc('id')
+    predicates.equalTo("task_id", this.id)
+      .and()
+      .equalTo("status", TaskItemStatus.WAIT)
+      .limitAs(pageSize)
+      .offsetAs(offset)
+      .orderByAsc('id')
     try {
       const rs = await DB.dbInstance?.store?.query(predicates);
       if (rs === undefined) {
         return [];
       }
       console.log(`task ${this.id}查询到 ${rs?.rowCount}条 item`)
-      if ( rs.rowCount <= 0) {
+      if (rs.rowCount <= 0) {
         return [];
       }
       while (rs.goToNextRow()) {
@@ -208,7 +234,11 @@ export class Task {
     let item: TaskItem | undefined = undefined;
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
     // predicates.equalTo("task_id", this.id).limitAs(pageSize).offsetAs(offset)
-    predicates.equalTo("task_id", this.id).and().equalTo("status", TaskItemStatus.UPLOADING).limitAs(1).orderByAsc('id')
+    predicates.equalTo("task_id", this.id)
+      .and()
+      .equalTo("status", TaskItemStatus.UPLOADING)
+      .limitAs(1)
+      .orderByAsc('id')
     try {
       const rs = await DB.dbInstance?.store?.query(predicates);
       if (rs === undefined || rs.rowCount <= 0) {
@@ -237,7 +267,7 @@ export class Task {
         return [];
       }
       // console.log(`task list util 查询到 ${rs?.rowCount}条任务`)
-      if ( rs.rowCount <= 0) {
+      if (rs.rowCount <= 0) {
         return [];
       }
       const items: Task[] = []
@@ -271,7 +301,9 @@ export class Task {
 
     try {
       const rs = await DB.dbInstance?.store?.query(predicates);
-      if (!rs || rs.rowCount <= 0) return undefined
+      if (!rs || rs.rowCount <= 0) {
+        return undefined
+      }
       while (rs.goToNextRow()) {
         const task = new Task()
         task.id = rs.getLong(rs.getColumnIndex('id'))
@@ -292,7 +324,7 @@ export class Task {
       console.log(`${err.code} => ${err.message}`)
       return undefined;
     }
-    return ;
+    return;
   }
 
   // 修复意外退出导致的任务状态错误
@@ -323,8 +355,8 @@ export class Task {
     let lastId: number = 0;
     let lastTimestamp: number = 0;
     if (config.backupType === BackupType.NEW) {
-      // 只备份新数据
-      lastTimestamp = Math.floor(Date.now() / 1000)
+      // 只备份新数据，开始时间是APP第一次打开时间
+      lastTimestamp = config.createdAt;
     }
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.orderByDesc('id').limitAs(1)
@@ -347,23 +379,27 @@ export class Task {
       // 1. 收集相册内容，并且写入taskitem表
       const items = await Photos.getPhotos(ctx, lastTimestamp, page, pageSize)
       // 写入数据库
-      if (items.length === 0) break;
+      if (items.length === 0) {
+        break;
+      }
       for (let item of items) {
         item.taskId = lastId;
         const rs = await item.save();
         if (rs) {
           size += item.size;
-          total ++;
+          total++;
         }
       }
-      if (items.length < pageSize) break;
-      page ++
+      if (items.length < pageSize) {
+        break;
+      }
+      page++
     }
     // 2. 写入task表
     if (total === 0) {
       // 没有新照片，什么也不用干
-      emitter.emit(Global.COLLECT_PHOTO_FINISH_EVENT, { data: {exists: false}})
-      return ;
+      emitter.emit(Global.COLLECT_PHOTO_FINISH_EVENT, { data: { exists: false } })
+      return;
     }
     const task = new Task();
     task.id = lastId;
@@ -377,10 +413,7 @@ export class Task {
     task.createdAt = Math.floor(Date.now() / 1000);
     task.updatedAt = 0;
     await task.save();
-    emitter.emit(Global.COLLECT_PHOTO_FINISH_EVENT, { data: {exists: true}})
+    emitter.emit(Global.COLLECT_PHOTO_FINISH_EVENT, { data: { exists: true } })
     return;
   }
-
-
-
 }

@@ -13,4 +13,5 @@ export class Global {
   static START_WAIT_TASK_EVENT = 'start_wait_task'; // 触发任务执行
   static STOP_TASK_EVENT = 'stop_task'; // 触发任务停止
   static UPDATE_TASK_EVENT = 'update_task_event'; // 开始执行某个任务
+  static CHUNK_SIZE = 5368709120; // 只能支持5G以内的文件传输，否则会因为读取大文件内存溢出。
 }

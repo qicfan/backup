@@ -70,7 +70,8 @@ export struct TaskFileItem {
       onConfirm: async () => {
         const rs = await this.fileItem.upload(getContext(this));
         if (rs) {
-          await this.fileItem.task.updateStat(this.fileItem.task.success+1, this.fileItem.task.failed - 1)
+          await this.fileItem.task.updateSuccess(1);
+          await this.fileItem.task.updateFailed(-1);
           emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: this.fileItem.taskId } })
         }
       }

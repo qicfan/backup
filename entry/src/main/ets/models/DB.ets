@@ -70,7 +70,8 @@ export class DB {
             "    created_at INTEGER,\n" +
             "    uploaded_at INTEGER\n" +
             ");";
-          const configIniSql = "INSERT INTO config VALUES (1, '', 'yyyy/mm/dd', 1, 1, 2, 0, 0)";
+          const dateNow = Math.floor(Date.now() / 1000);
+          const configIniSql = `INSERT INTO config VALUES (1, '', 'yyyy/mm/dd', 1, 1, 2, ${dateNow}, 0)`;
           try {
             store.executeSql(CREATE_CONFIG_TABLE);
             console.log("config table created.")

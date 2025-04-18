@@ -4,9 +4,10 @@ import { xml, util } from '@kit.ArkTS';
 import { DavResource, SERVER_AUTH_FAILED_EVENT } from "../typing";
 import { emitter } from "@kit.BasicServicesKit";
 import fileIo from "@ohos.file.fs";
-import { deletePhoto } from "./tools";
+import { deletePhoto, fileSize } from "./tools";
 import { TaskItem } from "../models/TaskItem";
 import { Task } from "../models/Task";
+import { Global } from "../models/Global";
 
 export class RequestReturn {
   success: boolean = true;
@@ -166,56 +167,26 @@ export class WebDav {
     return await this.request(req);
   }
 
-  async upload(taskItem: TaskItem, type: string = "default"): Promise<string> {
+  async upload(remoteUri: string, fileStream: fileIo.Stream, size: number, progressCallback: (transferredSize: number) => void): Promise<RequestReturn> {
     // 读取文件
-    let uploadFile: fileIo.File;
-    let uploadBuffer: ArrayBuffer;
-    if (type === "default") {
-      uploadBuffer = new ArrayBuffer(taskItem.size);
-    } else {
-      const stat = fileIo.statSync(taskItem.videoUri)
-      uploadBuffer = new ArrayBuffer(stat.size);
-    }
-    try {
-      uploadFile = fileIo.openSync(type === "default" ? taskItem.fileUri : taskItem.videoUri, fileIo.OpenMode.READ_ONLY);
-      fileIo.readSync(uploadFile.fd, uploadBuffer);
-    } catch (err) {
-      console.error(`读取要上传的文件失败. 文件路径：${type === "default" ? taskItem.fileUri : taskItem.videoUri}, Code: ${err.code}, message: ${err.message}`);
-      return "读取要上传的文件失败，请重试"
-    }
+    let uploadBuffer = new ArrayBuffer(size);
     const customHttpEventsHandler: rcp.HttpEventsHandler = {
       onUploadProgress: (totalSize: number, transferredSize: number) => {
-        if (type === 'default') {
-          taskItem.updateUploadedSize(transferredSize)
-          taskItem.task.updateUploadedSize(transferredSize)
-        }
+        progressCallback(transferredSize);
       }
     };
-    let url: string;
-    if (type === 'default') {
-      url = `${taskItem.config.backupRootPath}/${taskItem.remoteUri}`
-    } else {
-      url = `${taskItem.config.backupRootPath}/${taskItem.videoRemoteUri}`
-    }
     // console.log(`要上传的文件：${taskItem.fileUri}, 远程路径：${taskItem.remoteUri}, url: ${url}`)
-    const req = new rcp.Request(url, "PUT", {}, uploadBuffer, {}, {}, {tracing: {httpEventsHandler: customHttpEventsHandler} });
+    const req = new rcp.Request(remoteUri, "PUT", {}, uploadBuffer, {}, {}, {tracing: {httpEventsHandler: customHttpEventsHandler} });
     const rr = await this.request(req);
     if (rr.success) {
-      console.info("上传成功:" + (type === "default" ? taskItem.fileUri : taskItem.videoUri) + ', ' + rr.statusCode);
-      if (type === 'default') {
-        taskItem.updateUploadedSize(taskItem.size)
-        taskItem.task.updateUploadedSize(taskItem.size)
-      }
-      taskItem.success();
+      console.info("上传成功:" + (remoteUri) + ', ' + rr.statusCode);
       uploadBuffer = new ArrayBuffer(0);
-      deletePhoto(type === "default" ? taskItem.fileUri : taskItem.videoUri);
-      return "success";
+    } else {
+      rr.message = "上传失败，服务器返回状态: " + rr.statusCode + "，错误信息：" + rr.message;
+      console.error(rr.message);
+      uploadBuffer = new ArrayBuffer(0);
     }
-    console.error(`Failed to request the upload. Code: ${rr.statusCode}, message: ${rr.message}`);
-    fileIo.close(uploadFile)
-    uploadBuffer = new ArrayBuffer(0);
-    deletePhoto(type === "default" ? taskItem.fileUri : taskItem.videoUri)
-    return "上传失败，服务器返回状态: " + rr.statusCode + "，错误信息：" + rr.message;
+    return rr
   }
 
   // 解析dav xml
@@ -276,5 +247,72 @@ export class WebDav {
     that.parseXml(options);
     items.splice(0, 1)
     return items;
+  }
+
+  // 根据文件大小来判断是否分块上传
+  async uploadTaskItem(taskItem: TaskItem, type: string = "default"): Promise<string> {
+    return "测试上传失败";
+    let filePath: string = taskItem.fileUri;
+    let size: number = taskItem.size;
+    let remoteUri: string = `${taskItem.config.backupRootPath}/${taskItem.remoteUri}`;
+    if (type !== 'default') {
+      filePath = taskItem.videoUri;
+      size = fileSize(filePath);
+      remoteUri = `${taskItem.config.backupRootPath}/${taskItem.videoRemoteUri}`;
+    }
+    const fileStream = await fileIo.createStream(filePath, 'r');
+    if (size <= Global.CHUNK_SIZE) {
+      // 不需要分块，直接上传
+      const rr: RequestReturn = await this.upload(remoteUri, fileStream, size, (transferredSize: number) => {
+        if (type === 'default') {
+          taskItem.updateUploadedSize(transferredSize)
+          taskItem.task.updateUploadedSize(transferredSize)
+        }
+      });
+      fileStream.closeSync();
+      deletePhoto(filePath);
+      if (rr.success) {
+        if (type === 'default') {
+          await taskItem.updateUploadedSize(taskItem.size)
+          await taskItem.task.updateUploadedSize(taskItem.size)
+        }
+        return 'success';
+      } else {
+        return rr.message;
+      }
+    }
+    return await this.chunkUpload(remoteUri, fileStream, size, () => {});
+  }
+
+  // 分块上传
+  async chunkUpload(remoteUri: string, fileStream: fileIo.Stream, size: number, progressCallback: () => void): Promise<string> {
+    return "目前只支持5G以内的文件备份，过大的文件会因为内存占用过高导致APP性能底下或者溢出。";
+    // let offset = 0;
+    // let chunkIndex = 0;
+    // const totalChunks = Math.ceil(size / Global.CHUNK_SIZE);
+    //
+    // while (offset < size) {
+    //   const currentChunkSize = Math.min(Global.CHUNK_SIZE, size - offset);
+    //   const chunkBuffer = new ArrayBuffer(currentChunkSize);
+    //   await fileStream.read(chunkBuffer, {
+    //     offset,
+    //     length: currentChunkSize
+    //   });
+    //
+    //   const chunkUrl = `${remoteUri}.part${chunkIndex}`;
+    //   // 检查chunkUrl是否存在，以及校验文件是否一致，如果成功则跳过上传
+    //
+    // }
+    // return "success"
+  }
+
+  // 上传分块
+  async uploadChunk(chunkData: ArrayBuffer, chunkUrl: string, progressCallback: () => void) {
+
+  }
+
+  // 合并分块
+  async mergeChunk() {
+
   }
 }

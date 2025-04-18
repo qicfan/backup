@@ -24,7 +24,7 @@ export struct Login {
     // 判断数据是否为空
     if (this.serverPath === '' || this.username === '' || this.password === '') {
       IBestNotify.show({
-        message: '请输入共享路径、用户名、密码。',
+        message: '请输入服务器、用户名、密码。',
         duration: 3000,
         type: 'warning'
       })

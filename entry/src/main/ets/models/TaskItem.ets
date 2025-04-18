@@ -28,7 +28,6 @@ export class TaskItem {
   @Trace failedReason: string = '';
   createdAt: number = 0;
   uploadedAt: number = 0;
-
   static TABLE_NAME = 'task_items'
   public task: Task = new Task();
   public webdav: WebDav = new WebDav()
@@ -160,7 +159,7 @@ export class TaskItem {
     };
     try {
       await DB.dbInstance?.store?.insert(TaskItem.TABLE_NAME, insertBucket,
-          relationalStore.ConflictResolution.ON_CONFLICT_IGNORE);
+        relationalStore.ConflictResolution.ON_CONFLICT_IGNORE);
       // console.info(`task item insert row: ${rowId}`);
       return true;
     } catch (err) {
@@ -176,7 +175,9 @@ export class TaskItem {
   // 4. 上传文件
   // 5. 修改状态
   async upload(ctx: Context): Promise<boolean> {
-    if (this.status == TaskItemStatus.SUCCESS || this.status == TaskItemStatus.UPLOADING) return true;
+    if (this.status == TaskItemStatus.SUCCESS || this.status == TaskItemStatus.UPLOADING) {
+      return true;
+    }
     await this.start();
     const dirList: string[] = this.remoteUri.split('/').filter(part => part.length > 0);
     dirList.pop();
@@ -197,65 +198,57 @@ export class TaskItem {
       if ((rr.statusCode >= 200 && rr.statusCode < 300) || rr.statusCode == 405) {
         continue
       } else {
-        await this.failed("在服务器上创建目录"+currentPath+"失败");
+        await this.failed("在服务器上创建目录" + currentPath + "失败");
         // 创建目录失败
         console.log(`创建目录失败：${currentPath}`);
         return false;
       }
     }
+    let type = "default"
     try {
       // 如果时动态图，则获取图片和视频分别上传
-      if (this.photoType === photoAccessHelper.PhotoType.IMAGE && this.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
+      if (this.photoType === photoAccessHelper.PhotoType.IMAGE &&
+        this.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
+        type = "video";
         // 生成视频文件名称
         const tmpFe = splitFileExt(this.name);
         const videoName = `${tmpFe[1]}.mp4`;
         this.videoUri = this.fileUri.replace(this.name, videoName);
         this.videoRemoteUri = this.remoteUri.replace(this.name, videoName);
-        const rs = await Photos.saveMovingPhoto(ctx, this.uri, this.fileUri, this.videoUri)
+        const rs = await Photos.saveMovingPhoto(ctx, this.uri, this.fileUri, this.videoUri);
+
         if (rs !== 'success') {
           // 保存动态图片失败
           await this.failed(`无法保存动态图片${this.name}，原因：${rs}`);
           return false;
         }
-        let a = await this.webdav.upload(this);
-        if (a !== "success") {
-          // 失败了
-          this.failed(a);
-          // deletePhoto(this.fileUri);
-          return false;
-        }
-        let b = await this.webdav.upload(this, 'video');
-        if (b !== 'success') {
-          // 失败了
-          this.failed(b)
-          // deletePhoto(this.videoUri);
-          return false;
-        }
-        await this.success();
-        // 删除文件
-        // deletePhoto(this.fileUri);
-        // deletePhoto(this.videoUri);
-        return true;
       } else {
         copyPhoto(this.uri, this.size, this.fileUri);
-        // 上传文件
-        const rs = await this.webdav.upload(this);
-        console.log(`上传结果：${rs}`)
-        if (rs != "success") {
-          await this.failed(rs);
-        } else {
-          await this.success()
-        }
-        // deletePhoto(this.fileUri);
-        return rs === 'success'
       }
-
     } catch (e) {
       console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
       this.failed(e.message)
-      // deletePhoto(this.fileUri);
-      // deletePhoto(this.videoUri);
       return false;
     }
+    // 上传图片文件
+    const rs = await this.webdav.uploadTaskItem(this);
+    console.log(`上传结果：${rs}`)
+    if (rs != "success") {
+      await this.failed(rs);
+      return false;
+    } else {
+      await this.success()
+    }
+    if (type === 'video') {
+      let b = await this.webdav.uploadTaskItem(this, 'video');
+      if (b !== 'success') {
+        // 失败了
+        this.failed(b)
+        return false;
+      }
+      await this.success();
+    }
+    return true;
+
   }
 }

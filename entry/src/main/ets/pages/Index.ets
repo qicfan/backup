@@ -27,6 +27,7 @@ import { getBatteryLevel, getCurrentNetType } from "../utils/tools";
 import { connection } from "@kit.NetworkKit";
 import { PrivacyComponent } from "../components/PrivacyComponent";
 import { TaskFiles } from "../components/TaskFiles";
+import { DB } from "../models/DB";
 
 @Entry
 @ComponentV2
@@ -247,28 +248,6 @@ struct Index {
     return true;
   }
 
-  // 停止任务
-  async stopTask(taskOrId: number | Task, pause: boolean = false) {
-    let task: Task;
-    if (typeof taskOrId == "number") {
-      task = new Task();
-      task.id = taskOrId;
-      await task.fetch()
-    } else {
-      task = taskOrId;
-    }
-    this.global.processId = 0;
-    this.jobId = 0;
-    if (pause) {
-      this.stop = true;
-    }
-    await task.finish();
-    // 取消长时任务
-    backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
-    // 触发UI刷新
-    emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
-  }
-
   async startCreateTask(): Promise<boolean> {
     if (!(await this.canCreateTask())) {
       return false;
@@ -296,6 +275,29 @@ struct Index {
       }, 1000)
     }
     return true;
+  }
+
+  // 停止任务
+  async stopTask(taskOrId: number | Task, pause: boolean = false) {
+    let task: Task;
+    if (typeof taskOrId == "number") {
+      task = new Task();
+      task.id = taskOrId;
+      await task.fetch()
+    } else {
+      task = taskOrId;
+    }
+    this.global.processId = 0;
+    this.jobId = 0;
+    if (pause) {
+      this.stop = true;
+    }
+    console.log(`stop: ${this.stop}`)
+    await task.finish();
+    // 取消长时任务
+    backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
+    // 触发UI刷新
+    emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
   }
 
   startBackground(task: Task) {
@@ -327,7 +329,6 @@ struct Index {
               emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
               // 对于上传下载类的长时任务，应用可以使用res中返回的notificationId来更新通知，比如发送带进度条的模板通知。
               this.jobId = res.notificationId;
-              console.info("长时任务ID: " + this.jobId);
               // 将任务标记为开始执行
               await task.start();
               emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
@@ -347,6 +348,10 @@ struct Index {
               while (true) {
                 let curTotal = 0;
                 const items: TaskItem[] = await task.getWaitItems(page, pageSize)
+                if (items.length === 0) {
+                  // 没有查询到数据，直接退出
+                  break;
+                }
                 for (let item of items) {
                   if (this.stop) {
                     break;
@@ -365,16 +370,16 @@ struct Index {
                   task.preUploadedSize = task.uploadedSize;
                   item.updateWebDav(this.webdav, this.config)
                   try {
+                    DB.dbInstance.store?.beginTransaction();
                     const rs = await item.upload(this.ctxUIAbility)
                     if (rs) {
-                      task.success++
+                      await task.updateSuccess(1);
                     } else {
-                      task.failed++;
+                      await task.updateFailed(1);
                     }
-                    await task.updateStat(task.success, task.failed);
+                    DB.dbInstance.store?.commit();
                   } catch (e) {
-                    task.failed++;
-                    await task.updateStat(task.success, task.failed);
+                    DB.dbInstance.store?.rollBack();
                   } finally {
                     // 触发UI更新
                     emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
@@ -385,21 +390,19 @@ struct Index {
                 }
                 if (curTotal >= pageSize) {
                   page++;
-                  continue;
                 }
-                // 完成任务
-                this.stopTask(task)
-                setTimeout(() => {
-                  // 触发UI刷新
-                  emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
-                  if (!this.stop) {
-                    // 触发下一次执行
-                    emitter.emit(Global.START_WAIT_TASK_EVENT)
-                  }
-                }, 1000)
-                break;
               }
+              // 完成任务
+              await this.stopTask(task)
               this.stop = false;
+              setTimeout(() => {
+                // 触发UI刷新
+                emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
+                if (!this.stop && this.config.auto == AUTOBackup.YES) {
+                  // 触发下一次执行
+                  emitter.emit(Global.START_WAIT_TASK_EVENT)
+                }
+              }, 1000)
             })
             .catch((error: BusinessError) => {
               console.error(`启动长时任务失败. code is ${error.code} message is ${error.message}`);

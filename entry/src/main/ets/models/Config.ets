@@ -16,6 +16,7 @@ export class Config {
   @Trace auto: AUTOBackup = AUTOBackup.YES;
   @Trace onlyWifi: OnlyWIFIBackup = OnlyWIFIBackup.YES;
   updatedAt: number = 0;
+  createdAt: number = 0;
   private db: DB | null = null;
 
   constructor() {
@@ -36,6 +37,7 @@ export class Config {
         this.onlyWifi = rs.getLong(rs.getColumnIndex("only_wifi_backup"))
         this.auto = rs.getLong(rs.getColumnIndex("auto"))
         this.updatedAt = rs.getLong(rs.getColumnIndex("updated_at"))
+        this.createdAt = rs.getLong(rs.getColumnIndex("created_at"))
         rs.close();
         if (this.backupRootPath == "") return 3;
         return 1;
