@@ -190,6 +190,11 @@ export struct Settings {
 
           About()
 
+          Text("陕ICP备2025065287号-2A")
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .margin({top: $r('app.float.normal_padding'), bottom: $r('app.float.normal_padding')})
+
           // 弹出层
           IBestPopup({
             visible: this.showBackupTypePopup!!,
