@@ -25,7 +25,7 @@ import { TaskItem } from "../models/TaskItem";
 import { checkPermissions } from "../utils/permission";
 import { getBatteryLevel, getCurrentNetType } from "../utils/tools";
 import { connection } from "@kit.NetworkKit";
-import { PrivacyComponent } from "../components/PrivacyComponent";
+import { Privacy } from "../components/Privacy";
 import { TaskFiles } from "../components/TaskFiles";
 import { TipDialog } from "../dialogs/TipDialog";
 import { Dialog } from "../utils/dialog";
@@ -541,7 +541,7 @@ struct Index {
     } else if (name === "Settings") {
       Settings()
     } else if (name === "PrivacyComponent") {
-      PrivacyComponent()
+      Privacy()
     } else if(name == "TaskFiles") {
       TaskFiles()
     } else if(name == "agreement") {
