@@ -20,6 +20,7 @@ export class Task {
   @Trace success: number = 0;
   @Trace failed: number = 0;
   @Trace status: TaskStatus = TaskStatus.WAIT
+  @Trace cancelReason: string = "";
   createdAt: number = 0;
   updatedAt: number = 0;
   public preUploadedSize = 0;
@@ -42,6 +43,7 @@ export class Task {
         this.success = rs.getLong(rs.getColumnIndex('success'))
         this.failed = rs.getLong(rs.getColumnIndex('failed'))
         this.status = rs.getLong(rs.getColumnIndex('status'))
+        this.cancelReason = rs.getString(rs.getColumnIndex('cancel_reason'))
         this.createdAt = rs.getLong(rs.getColumnIndex('created_at'))
         this.updatedAt = rs.getLong(rs.getColumnIndex('updated_at'))
         return true;
@@ -66,9 +68,12 @@ export class Task {
     await this.updateStatus();
   }
 
-  async finish(): Promise<void> {
+  async finish(reason?: string): Promise<void> {
+    console.log(`任务停止原因1：${reason}`)
     await this.fetch();
-    if ((this.success + this.failed) != this.total) {
+    if (reason) this.cancelReason = reason;
+    console.log(`任务停止原因2：${this.cancelReason}`)
+    if ((this.success + this.failed) < this.total) {
       console.log(`状态改为等待，failed: ${this.failed}, success: ${this.success}`)
       return await this.wait();
     }
@@ -81,6 +86,7 @@ export class Task {
     this.updatedAt = Math.floor(Date.now() / 1000);
     const updateBucket: relationalStore.ValuesBucket = {
       "status": this.status,
+      "cancel_reason": this.cancelReason,
       "updated_at": this.updatedAt,
     };
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
@@ -88,7 +94,7 @@ export class Task {
     try {
       await DB.dbInstance?.store?.update(updateBucket, predicates);
     } catch (err) {
-      console.error(`task Insert failed, code is ${err.code},message is ${err.message}`);
+      console.error(`task update failed, code is ${err.code},message is ${err.message}`);
     }
   }
 
@@ -99,7 +105,6 @@ export class Task {
     } else {
       sql = `UPDATE ${Task.TABLE_NAME} SET success = success - ${count} WHERE id=?`
     }
-    console.log(sql);
     try {
       await DB.dbInstance.store?.executeSql(sql, [this.id]);
       await this.fetch();
@@ -115,7 +120,6 @@ export class Task {
     } else {
       sql = `UPDATE ${Task.TABLE_NAME} SET failed = failed - ${count} WHERE id=?`
     }
-    console.log(sql);
     try {
       await DB.dbInstance.store?.executeSql(sql, [this.id]);
       await this.fetch();
@@ -126,6 +130,7 @@ export class Task {
 
   async updateUploadedSize(uploadedSize: number) {
     this.uploadedSize = this.preUploadedSize + uploadedSize;
+    this.updatedAt =  Math.floor(Date.now() / 1000);
     const updateBucket: relationalStore.ValuesBucket = {
       "uploaded_size": this.uploadedSize,
       "updated_at": this.updatedAt,
@@ -149,11 +154,11 @@ export class Task {
       "success": this.success,
       "failed": this.failed,
       "status": this.status,
+      "cancel_reason": this.cancelReason,
       "created_at": this.createdAt,
       "updated_at": this.updatedAt,
     };
     try {
-      const rowId =
         await DB.dbInstance?.store?.insert('task', insertBucket);
       // console.info(`task Insert row: ${rowId}`);
     } catch (err) {
@@ -199,19 +204,18 @@ export class Task {
     const items: TaskItem[] = [];
     const offset = (page - 1) * pageSize;
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
-    // predicates.equalTo("task_id", this.id).limitAs(pageSize).offsetAs(offset)
     predicates.equalTo("task_id", this.id)
       .and()
-      .equalTo("status", TaskItemStatus.WAIT)
+      .in("status", [TaskItemStatus.WAIT, TaskItemStatus.UPLOADING])
       .limitAs(pageSize)
       .offsetAs(offset)
       .orderByAsc('id')
+    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE task_id=? AND status IN (?, ?) AND uploaded_size < size ORDER BY id ASC LIMIT 0, ?`;
     try {
-      const rs = await DB.dbInstance?.store?.query(predicates);
+      const rs = await DB.dbInstance?.store?.querySql(SQL, [this.id, TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, pageSize]);
       if (rs === undefined) {
         return [];
       }
-      console.log(`task ${this.id}查询到 ${rs?.rowCount}条 item`)
       if (rs.rowCount <= 0) {
         return [];
       }
@@ -266,7 +270,6 @@ export class Task {
       if (rs === undefined) {
         return [];
       }
-      // console.log(`task list util 查询到 ${rs?.rowCount}条任务`)
       if (rs.rowCount <= 0) {
         return [];
       }
@@ -281,6 +284,7 @@ export class Task {
         taskItem.success = rs.getLong(rs.getColumnIndex('success'))
         taskItem.failed = rs.getLong(rs.getColumnIndex('failed'))
         taskItem.status = rs.getLong(rs.getColumnIndex('status'))
+        taskItem.cancelReason = rs.getString(rs.getColumnIndex('cancel_reason'))
         taskItem.createdAt = rs.getLong(rs.getColumnIndex('created_at'))
         taskItem.updatedAt = rs.getLong(rs.getColumnIndex('updated_at'))
         items.push(taskItem)
@@ -314,6 +318,7 @@ export class Task {
         task.success = rs.getLong(rs.getColumnIndex('success'))
         task.failed = rs.getLong(rs.getColumnIndex('failed'))
         task.status = rs.getLong(rs.getColumnIndex('status'))
+        task.cancelReason = rs.getString(rs.getColumnIndex('cancel_reason'))
         task.createdAt = rs.getLong(rs.getColumnIndex('created_at'))
         task.updatedAt = rs.getLong(rs.getColumnIndex('updated_at'))
         rs.close();
@@ -386,7 +391,7 @@ export class Task {
         item.taskId = lastId;
         const rs = await item.save();
         if (rs) {
-          size += item.size;
+          size += item.size + item.videoSize;
           total++;
         }
       }
@@ -410,6 +415,7 @@ export class Task {
     task.success = 0;
     task.failed = 0;
     task.status = TaskStatus.WAIT;
+    task.cancelReason = "";
     task.createdAt = Math.floor(Date.now() / 1000);
     task.updatedAt = 0;
     await task.save();

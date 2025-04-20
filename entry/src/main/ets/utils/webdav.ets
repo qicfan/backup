@@ -2,19 +2,18 @@ import { rcp } from "@kit.RemoteCommunicationKit";
 import { ServerConfig } from "../models/Server";
 import { xml, util } from '@kit.ArkTS';
 import { DavResource, SERVER_AUTH_FAILED_EVENT } from "../typing";
-import { emitter } from "@kit.BasicServicesKit";
+import { BusinessError, emitter, request } from "@kit.BasicServicesKit";
 import fileIo from "@ohos.file.fs";
-import { deletePhoto, fileSize } from "./tools";
+import { base64Encode, calculateFileHash, deletePhoto, fileSize, getMimeTypeFromExtension, strip } from "./tools";
 import { TaskItem } from "../models/TaskItem";
-import { Task } from "../models/Task";
-import { Global } from "../models/Global";
 
 export class RequestReturn {
   success: boolean = true;
   statusCode: number = 200;
   message: string = "";
-  data: DavResource[] = [];
-  body: string = ""
+  data?: DavResource[] = [];
+  body?: string = ""
+  headers: rcp.ResponseHeaders = {}
 }
 
 @ObservedV2
@@ -25,8 +24,8 @@ export class WebDavResource implements DavResource {
 }
 
 export class WebDav {
-  private session: rcp.Session | null = null;
-  private server: ServerConfig = new ServerConfig();
+  public session: rcp.Session | null = null;
+  public server: ServerConfig = new ServerConfig();
 
   constructor(serverConfig?: ServerConfig) {
     if (serverConfig !== undefined) {
@@ -67,9 +66,14 @@ export class WebDav {
     try {
       const resp = await this.session?.fetch(req);
       if (resp === undefined) {
-        throw new Error("请求失败")
+        requestReturn.statusCode = 500;
+        requestReturn.success = false;
+        requestReturn.message = "请求失败"
+        return requestReturn;
       }
+      // console.log(JSON.stringify(resp.headers));
       requestReturn.statusCode = resp.statusCode;
+      requestReturn.headers = resp.headers;
       if (resp.statusCode === 401) {
         requestReturn.message = "用户名密码不正确"
         requestReturn.success = false;
@@ -85,7 +89,7 @@ export class WebDav {
         requestReturn.message = "目录不存在，请先创建目录"
         requestReturn.success = false;
       }
-      if(resp.statusCode === 507) {
+      if (resp.statusCode === 507) {
         requestReturn.message = "服务器存储空间不足"
         requestReturn.success = false;
       }
@@ -127,7 +131,7 @@ export class WebDav {
     const req = new rcp.Request(path, "PROPFIND", { "Depth": "1" }, body);
     const rr = await this.request(req);
     if (rr.statusCode === 200) {
-      const items = this.parseXml(rr.body);
+      const items = this.parseXml(rr.body ? rr.body : "");
       const dirs: WebDavResource[] = [];
       items.forEach((item: WebDavResource) => {
         if (item.type === 'collection') {
@@ -135,24 +139,33 @@ export class WebDav {
         }
       })
       rr.data = dirs;
+    } else {
+      console.log(`get dir, return : ${JSON.stringify(rr)}`)
     }
     return rr;
   }
 
   // 是否存在
-  async exists(path: string) {
-    const body = "<?xml version=\"1.0\"?>\n" +
-      "<d:propfind xmlns:d=\"DAV:\">\n" +
-      "  <d:prop>\n" +
-      "    <d:resourcetype/>\n" +
-      "  </d:prop>\n" +
-      "</d:propfind>"
-    const req = new rcp.Request(path, "PROPFIND", { "Depth": "0" }, body);
+  async exists(path: string, size: number) {
+    const req = new rcp.Request(path, "HEAD");
     const rr = await this.request(req);
-    if (rr.statusCode === 200) {
-      return true;
+    // 不存在
+    if (!rr.success) return 0;
+    let remoteSize: number = 0;
+    let remoteSizeArr: string | string[] | undefined =rr.headers['content-length'];
+    if (remoteSizeArr === undefined) {
+      remoteSize = 0;
+    } else if (typeof remoteSizeArr !== 'string') {
+      remoteSize = parseInt(remoteSizeArr[0]);
+    } else {
+      remoteSize = parseInt(remoteSizeArr)
     }
-    return false;
+    console.log(`文件存在，比较大小是否一致, ${remoteSize}=>${size}`)
+    if (remoteSize == size) {
+      return 1
+    } else {
+      return 2;
+    }
   }
 
   // 创建目录
@@ -167,16 +180,19 @@ export class WebDav {
     return await this.request(req);
   }
 
-  async upload(remoteUri: string, fileStream: fileIo.Stream, size: number, progressCallback: (transferredSize: number) => void): Promise<RequestReturn> {
+  async upload(remoteUri: string, fileStream: fileIo.Stream, size: number,
+    progressCallback: (transferredSize: number) => void): Promise<RequestReturn> {
     // 读取文件
     let uploadBuffer = new ArrayBuffer(size);
+    await fileStream.read(uploadBuffer, { offset: 0, length: size });
     const customHttpEventsHandler: rcp.HttpEventsHandler = {
       onUploadProgress: (totalSize: number, transferredSize: number) => {
         progressCallback(transferredSize);
       }
     };
     // console.log(`要上传的文件：${taskItem.fileUri}, 远程路径：${taskItem.remoteUri}, url: ${url}`)
-    const req = new rcp.Request(remoteUri, "PUT", {}, uploadBuffer, {}, {}, {tracing: {httpEventsHandler: customHttpEventsHandler} });
+    const req = new rcp.Request(remoteUri, "PUT", {}, uploadBuffer, {}, {},
+      { tracing: { httpEventsHandler: customHttpEventsHandler } });
     const rr = await this.request(req);
     if (rr.success) {
       console.info("上传成功:" + (remoteUri) + ', ' + rr.statusCode);
@@ -187,6 +203,75 @@ export class WebDav {
       uploadBuffer = new ArrayBuffer(0);
     }
     return rr
+  }
+
+  getBase64Auth(): string {
+    return base64Encode(`${this.server.username}:${this.server.password}`)
+  }
+
+  // 使用系统上传方法进行上传，看是否能解决大文件上传问题。
+  uploadBySys(context: Context, name: string, remoteUri: string, filePath: string,
+    progressCallback: (transferredSize: number) => void): Promise<RequestReturn> {
+    return new Promise(async (resolve) => {
+      let filesDir = context.cacheDir;
+      filePath = filePath.replace(filesDir, 'internal://cache')
+      // 上传任务配置项
+      let files: Array<request.File> = [
+        {
+          filename: name,
+          name: 'file',
+          uri: filePath,
+          type: getMimeTypeFromExtension(name)
+        }
+      ]
+      let data: Array<request.RequestData> = [];
+      let uploadConfig: request.UploadConfig = {
+        url: remoteUri,
+        header: {
+          'Authorization': 'Basic ' + this.getBase64Auth()
+        },
+        method: 'PUT',
+        files: files,
+        data: data
+      }
+
+      // 将本地应用文件上传至网络服务器
+      try {
+        const uploadTask: request.UploadTask = await request.uploadFile(context, uploadConfig)
+        uploadTask.on('complete', (taskStates: Array<request.TaskState>) => {
+          for (let i = 0; i < taskStates.length; i++) {
+            let rr: RequestReturn = {
+              statusCode: 500,
+              success: false,
+              message: "",
+              headers: {}
+            };
+            if (taskStates[i].responseCode === 0) {
+              rr.success = true;
+              rr.statusCode = 200;
+            } else {
+              rr.success = false;
+              rr.statusCode = taskStates[i].responseCode;
+              rr.message = taskStates[i].message;
+            }
+            resolve(rr);
+          }
+        });
+        uploadTask.on("progress", (uploadedSize: number, totalSize: number) => {
+          progressCallback(uploadedSize);
+        })
+      } catch (error) {
+        let err: BusinessError = error as BusinessError;
+        console.error(`Invoke uploadFile failed, code is ${err.code}, message is ${err.message}`);
+        let rr: RequestReturn = {
+          statusCode: err.code,
+          success: false,
+          message: err.message,
+          headers: {}
+        };
+        resolve(rr);
+      }
+    });
   }
 
   // 解析dav xml
@@ -250,68 +335,25 @@ export class WebDav {
   }
 
   // 根据文件大小来判断是否分块上传
-  async uploadTaskItem(taskItem: TaskItem, type: string = "default"): Promise<string> {
+  async uploadTaskItem(ctx: Context, taskItem: TaskItem, type: string = "default"): Promise<string> {
     let filePath: string = taskItem.fileUri;
-    let size: number = taskItem.size;
-    let remoteUri: string = `${taskItem.config.backupRootPath}/${taskItem.remoteUri}`;
+    let remoteUri: string = taskItem.getFullRemoteUri(taskItem.remoteUri, true);
     if (type !== 'default') {
       filePath = taskItem.videoUri;
-      size = fileSize(filePath);
-      remoteUri = `${taskItem.config.backupRootPath}/${taskItem.videoRemoteUri}`;
+      remoteUri = taskItem.getFullRemoteUri(taskItem.remoteVideoUri, true);
     }
-    const fileStream = await fileIo.createStream(filePath, 'r');
-    if (size <= Global.CHUNK_SIZE) {
-      // 不需要分块，直接上传
-      const rr: RequestReturn = await this.upload(remoteUri, fileStream, size, (transferredSize: number) => {
+    const rr: RequestReturn = await this.uploadBySys(ctx, taskItem.name, remoteUri, filePath, (transferredSize: number) => {
         if (type === 'default') {
           taskItem.updateUploadedSize(transferredSize)
           taskItem.task.updateUploadedSize(transferredSize)
         }
-      });
-      fileStream.closeSync();
-      deletePhoto(filePath);
-      if (rr.success) {
-        if (type === 'default') {
-          await taskItem.updateUploadedSize(taskItem.size)
-          await taskItem.task.updateUploadedSize(taskItem.size)
-        }
-        return 'success';
-      } else {
-        return rr.message;
-      }
+    });
+    deletePhoto(filePath);
+    console.log(`${remoteUri}上传成功，删除本地临时文件：${filePath}`)
+    if (rr.success) {
+      return 'success';
+    } else {
+      return rr.message;
     }
-    return await this.chunkUpload(remoteUri, fileStream, size, () => {});
-  }
-
-  // 分块上传
-  async chunkUpload(remoteUri: string, fileStream: fileIo.Stream, size: number, progressCallback: () => void): Promise<string> {
-    return "目前只支持5G以内的文件备份，过大的文件会因为内存占用过高导致APP性能底下或者溢出。";
-    // let offset = 0;
-    // let chunkIndex = 0;
-    // const totalChunks = Math.ceil(size / Global.CHUNK_SIZE);
-    //
-    // while (offset < size) {
-    //   const currentChunkSize = Math.min(Global.CHUNK_SIZE, size - offset);
-    //   const chunkBuffer = new ArrayBuffer(currentChunkSize);
-    //   await fileStream.read(chunkBuffer, {
-    //     offset,
-    //     length: currentChunkSize
-    //   });
-    //
-    //   const chunkUrl = `${remoteUri}.part${chunkIndex}`;
-    //   // 检查chunkUrl是否存在，以及校验文件是否一致，如果成功则跳过上传
-    //
-    // }
-    // return "success"
-  }
-
-  // 上传分块
-  async uploadChunk(chunkData: ArrayBuffer, chunkUrl: string, progressCallback: () => void) {
-
-  }
-
-  // 合并分块
-  async mergeChunk() {
-
   }
 }

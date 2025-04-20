@@ -77,8 +77,7 @@ export class ServerConfig {
     attr.set(asset.Tag.ALIAS, stringToArray(PASSWORD_ALIAS));
     attr.set(asset.Tag.ACCESSIBILITY, asset.Accessibility.DEVICE_UNLOCKED); // 设备解锁状态可访问
     attr.set(asset.Tag.AUTH_TYPE, asset.AuthType.NONE) // 不需要认证即可访问数据
-    attr.set(asset.Tag.SYNC_TYPE, asset.SyncType.TRUSTED_ACCOUNT) // 在信任设备上登录账号时可同步
-    attr.set(asset.Tag.IS_PERSISTENT, false) // 卸载应用时删除关键资产
+    attr.set(asset.Tag.IS_PERSISTENT, false) // 卸载应用时删除
     attr.set(asset.Tag.CONFLICT_RESOLUTION, asset.ConflictResolution.OVERWRITE) // 冲突时覆盖旧的
     attr.set(asset.Tag.DATA_LABEL_NORMAL_1, stringToArray(username)); // 用户名
     attr.set(asset.Tag.DATA_LABEL_NORMAL_2, stringToArray(server)); // 服务器地址

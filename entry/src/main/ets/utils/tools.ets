@@ -2,19 +2,20 @@ import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { connection } from '@kit.NetworkKit';
 import { batteryInfo, BusinessError } from '@kit.BasicServicesKit';
+import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 
-export function copyPhoto(uri: string, size: number, destFilePath: string) {
+export async function copyPhoto(uri: string, size: number, destFilePath: string) {
   let destPath: fileIo.File;
   let file: fileIo.File;
   let fileStat: fileIo.Stat;
   try {
-    destPath = fileIo.openSync(destFilePath, fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY);
+    destPath = await fileIo.open(destFilePath, fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY);
   } catch(e) {
     console.log(`创建临时文件${destFilePath}失败, code:${e.code}. msg:${e.message}`)
     return false;
   }
   try {
-    file = fileIo.openSync(uri);
+    file = await fileIo.open(uri);
   } catch(e) {
     console.log(`打开${uri}失败, code:${e.code}. msg:${e.message}`)
     return false;
@@ -22,19 +23,19 @@ export function copyPhoto(uri: string, size: number, destFilePath: string) {
   let buffSize = 4096;
   let buffer: ArrayBuffer = new ArrayBuffer(Math.min(buffSize, size));
   let off: number = 0;
-  let len: number = fileIo.readSync(file.fd, buffer, { offset: off, length: buffSize });
+  let len: number = await fileIo.read(file.fd, buffer, { offset: off, length: buffSize });
   let readLen: number = 0;
   while (len > 0) {
     readLen += len;
-    fileIo.writeSync(destPath.fd, buffer, { offset: off, length: buffSize })
+    await fileIo.write(destPath.fd, buffer, { offset: off, length: buffSize })
     off = off + len;
     if ((size - readLen) < buffSize) {
       buffSize = size - readLen;
     }
-    len = fileIo.readSync(file.fd, buffer, { offset: off, length: buffSize });
+    len = await fileIo.read(file.fd, buffer, { offset: off, length: buffSize });
   }
-  fileIo.closeSync(file.fd)
-  fileIo.closeSync(destPath.fd)
+  await fileIo.close(file.fd)
+  await fileIo.close(destPath.fd)
   return true;
 }
 
@@ -158,4 +159,34 @@ export function fileSize(filePath: string): number {
     return -1;
   }
 
+}
+
+// 计算文件hash
+export async function calculateFileHash(fileStream: fileIo.Stream, size: number): Promise<string> {
+  try {
+    const sha256 = cryptoFramework.createMd('MD5');
+    const bufferSize = 4096;
+    let offset = 0;
+
+    while (offset < size) {
+      const readSize = Math.min(bufferSize, size - offset);
+      const arrayBuffer = new ArrayBuffer(readSize);
+      // await fileIo.read(file.fd, arrayBuffer, { offset });
+      await fileStream.read(arrayBuffer, {offset: offset, length: readSize})
+      await sha256.update({ data: new Uint8Array(arrayBuffer) });
+      offset += readSize;
+    }
+    const hash = await sha256.digest();
+    // const textDecoder: util.TextDecoder = util.TextDecoder.create(); // 调用util模块的TextDecoder类
+    // const result: string = textDecoder.decodeToString(hash.data); // 对uint8Array解码
+    return Array.from(hash.data)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch (error) {
+    console.error('计算文件哈希出错:', (error as BusinessError).message);
+    return "";
+  }
+}
+export function strip(str: string, trip: string) {
+  return str.endsWith(trip) ? str.slice(0, -1) : str;
 }

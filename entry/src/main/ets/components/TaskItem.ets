@@ -7,6 +7,8 @@ import { Global } from "../models/Global";
 
 @ComponentV2
 export struct TaskItem {
+  @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack()
+
   @Param task: Task = new Task();
   @Local doing: boolean = false;
 
@@ -92,10 +94,23 @@ export struct TaskItem {
                 value: this.process
               })
             }
+            .width('100%')
             .padding({ left: $r("app.float.normal_padding") })
+          }
+          if (this.task.cancelReason !== "" && this.task.status === TaskStatus.WAIT) {
+            Column() {
+              Text('上次停止原因：' + this.task.cancelReason)
+                .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+                .textAlign(TextAlign.Start)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
           }
         }
         .layoutWeight(1)
+        .onClick(() => {
+          this.pageInfos.pushPath({name: "TaskFiles", param: this.task.id})
+        })
 
         Column() {
           if (this.task.status == TaskStatus.WAIT) {

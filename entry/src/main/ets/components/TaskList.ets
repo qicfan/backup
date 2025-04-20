@@ -65,9 +65,6 @@ export struct TaskList {
       List() {
         ForEach(this.list, (item: Task) => {
           TaskItem({task: item})
-            .onClick(() => {
-              this.pageInfos.pushPath({name: "TaskFiles", param: item.id})
-            })
         }, (item: Task) => item.id + '')
       }
       .width('100%')

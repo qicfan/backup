@@ -4,6 +4,7 @@ import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { TaskItem } from "../models/TaskItem";
 import { image } from "@kit.ImageKit";
+import { fileSize } from "./tools";
 
 export class Photos {
   /**
@@ -37,18 +38,28 @@ export class Photos {
         let ps: photoAccessHelper.PhotoAsset;
         ps = await fetchRs.getNextObject()
         const item = new TaskItem()
+        item.dateAdded = ps.get('date_added') as number;
+        if (item.dateAdded < lastTimestamp) {
+          continue;
+        }
         item.uri = ps.uri;
         item.photoType = ps.photoType as number;
         item.subType = ps.get('subtype') as number;
         item.name = ps.displayName;
-        item.dateAdded = ps.get('date_added') as number;
         item.dateModified = ps.get('date_modified') as number;
         item.size = ps.get('size') as number;
         item.status = TaskItemStatus.WAIT;
-        item.makeRemoteUri()
-        item.makeFileUri(ctx)
-        if (item.dateAdded < lastTimestamp) {
-          continue;
+        item.makeUri(ctx)
+        // 处理动态图片
+        if (item.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
+          // 保存动态图片的视频
+          const videoSize = await Photos.saveMovingPhotoVideoByAsset(ctx, ps, item.videoUri);
+          if (videoSize === -1) {
+            continue;
+          }
+          item.videoSize = videoSize;
+        } else {
+          item.videoSize = 0;
         }
         items.push(item)
       }
@@ -78,6 +89,38 @@ export class Photos {
       }
       let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
       resolve(asset);
+    });
+  }
+
+  // 通过uri获取PhotoAsset做进一步的展示
+  static async saveMovingPhotoVideoByAsset(ctx: Context, asset: photoAccessHelper.PhotoAsset, videoUri: string): Promise<number> {
+    return new Promise(async (resolve, reject) => {
+      let requestOptions: photoAccessHelper.RequestOptions = {
+        deliveryMode: photoAccessHelper.DeliveryMode.HIGH_QUALITY_MODE,
+      }
+
+      try {
+        await photoAccessHelper.MediaAssetManager.requestMovingPhoto(ctx, asset, requestOptions, {
+          onDataPrepared: (movingPhoto: photoAccessHelper.MovingPhoto) => {
+            if (movingPhoto === undefined) {
+              console.error("读取动态图片数据出错，请检查该图片是否存在或重试")
+              return resolve(-1);
+            }
+            console.info(`读取动态图片${asset.get('uri')}的视频，视频本地路径:${videoUri}`)
+            movingPhoto.requestContent(photoAccessHelper.ResourceType.VIDEO_RESOURCE, videoUri).then(() => {
+              // 读取文件大小返回
+              const size = fileSize(videoUri);
+              resolve(size)
+            }).catch((err: BusinessError) => {
+              console.error(`动态图片保存视频失败, error code is ${err.code}, message is ${err.message}`);
+              reject(err)
+            })
+          }
+        });
+      } catch (err) {
+        console.error(`failed to request moving photo, error code is ${err.code}, message is ${err.message}`);
+        reject(err)
+      }
     });
   }
 
@@ -129,7 +172,6 @@ export class Photos {
         let requestId: string = await photoAccessHelper.MediaAssetManager.requestMovingPhoto(ctx, asset, requestOptions, {
           onDataPrepared: (movingPhoto: photoAccessHelper.MovingPhoto) => {
             if (movingPhoto === undefined) {
-              console.error('Error occurred when preparing data');
               resolve("读取动态图片数据出错，请检查该图片是否存在或重试")
             }
             console.info(`读取动态图片${uri}，图片：${movingPhoto.getUri()}=>${imageUri}, 视频:${videoUri}`)
@@ -141,7 +183,6 @@ export class Photos {
             })
           }
         });
-        console.info("moving photo requested successfully, requestId: " + requestId);
       } catch (err) {
         console.error(`failed to request moving photo, error code is ${err.code}, message is ${err.message}`);
         reject(err)

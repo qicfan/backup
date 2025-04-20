@@ -11,18 +11,15 @@ import { About } from "./About";
 
 class Params {
   rootPath: string = ""
-  close: () => void = () => {
-  }
 
-  constructor(rootPath: string, close: () => void) {
+  constructor(rootPath: string) {
     this.rootPath = rootPath;
-    this.close = close
   }
 }
 
 @Builder
-function buildLogin(params: Params) {
-  FolderSelectDialog({ rootPath: params.rootPath, close: params.close })
+function buildDirSelect(params: Params) {
+  FolderSelectDialog({ rootPath: params.rootPath })
 }
 
 @ComponentV2
@@ -47,22 +44,18 @@ export struct Settings {
   }
   private ctx: UIContext = this.getUIContext();
   // 登录弹窗的节点
-  private loginDialogContentNode: ComponentContent<Object> =
-    new ComponentContent(this.ctx, wrapBuilder(buildLogin), new Params(this.config.backupRootPath, this.closeDialog))
+  private selectDirDialogContentNode: ComponentContent<Object> =
+    new ComponentContent(this.ctx, wrapBuilder(buildDirSelect), new Params(this.config.backupRootPath))
 
   private openFolderSelectDialog() {
     Dialog.setContext(this.ctx);
-    Dialog.setContentNode(this.loginDialogContentNode);
+    Dialog.setContentNode(this.selectDirDialogContentNode);
     Dialog.setOptions({
       alignment: DialogAlignment.BottomStart,
       isModal: true,
       transition: TransitionEffect.move(TransitionEdge.BOTTOM).animation({ duration: 500, curve: Curve.Ease })
     });
     Dialog.openDialog();
-  }
-
-  private closeDialog() {
-    Dialog.closeDialog();
   }
 
   @Builder
@@ -179,13 +172,18 @@ export struct Settings {
           })
 
           Cell({
-            title: "协议和声明",
             left: "隐私协议",
             showArrow: true
           })
             .onClick(() => {
-              // 跳转到登录页面
               this.pageInfos.pushPathByName("PrivacyComponent", true);
+            })
+          Cell({
+            left: "用户协议",
+            showArrow: true
+          })
+            .onClick(() => {
+              this.pageInfos.pushPathByName("agreement", true);
             })
 
           About()
@@ -224,7 +222,6 @@ export struct Settings {
               duration: 3000
             })
           }
-
         }
       }
     ])

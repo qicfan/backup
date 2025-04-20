@@ -37,6 +37,7 @@ export class DB {
             "    low_battery_stop INTEGER    DEFAULT (1),\n" +
             "    only_wifi_backup INTEGER    DEFAULT (1),\n" +
             "    auto INTEGER    DEFAULT (1),\n" +
+            "    first INTEGER    DEFAULT (0),\n" +
             "    created_at       INTEGER,\n" +
             "    updated_at       INTEGER\n" +
             ");\n"
@@ -49,6 +50,7 @@ export class DB {
             "    success    INTEGER DEFAULT (0),\n" +
             "    failed     INTEGER DEFAULT (0),\n" +
             "    status     INTEGER DEFAULT (0),\n" +
+            "    cancel_reason    TEXT (1024),\n" +
             "    created_at INTEGER,\n" +
             "    updated_at INTEGER\n" +
             ");";
@@ -59,6 +61,9 @@ export class DB {
             "    uri    TEXT (1024),\n" +
             "    file_uri    TEXT (1024),\n" +
             "    remote_uri  TEXT (512),\n" +
+            "    video_uri  TEXT (512),\n" +
+            "    remote_video_uri  TEXT (512),\n" +
+            "    video_size  INTEGER DEFAULT (0),\n" +
             "    failed_reason  TEXT (512),\n" +
             "    photo_type     INTEGER,\n" +
             "    sub_type     INTEGER,\n" +
@@ -71,7 +76,7 @@ export class DB {
             "    uploaded_at INTEGER\n" +
             ");";
           const dateNow = Math.floor(Date.now() / 1000);
-          const configIniSql = `INSERT INTO config VALUES (1, '', 'yyyy/mm/dd', 1, 1, 2, ${dateNow}, 0)`;
+          const configIniSql = `INSERT INTO config VALUES (1, '', 'yyyy/mm/dd', 1, 1, 2, 0, ${dateNow}, 0)`;
           try {
             store.executeSql(CREATE_CONFIG_TABLE);
             console.log("config table created.")

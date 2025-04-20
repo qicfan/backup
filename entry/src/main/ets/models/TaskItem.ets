@@ -1,14 +1,14 @@
 import { TaskItemStatus } from "../typing";
-import { common } from "@kit.AbilityKit";
 import { intl } from '@kit.LocalizationKit';
 import { relationalStore } from "@kit.ArkData";
 import { DB } from "./DB";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
-import { copyPhoto, deletePhoto, splitFileExt } from "../utils/tools";
-import { WebDav } from "../utils/webdav";
+import { copyPhoto, splitFileExt, strip } from "../utils/tools";
+import { RequestReturn, WebDav } from "../utils/webdav";
 import { Config } from "./Config";
 import { Task } from "./Task";
 import { Photos } from "../utils/photos";
+import { common } from "@kit.AbilityKit";
 
 @ObservedV2
 export class TaskItem {
@@ -16,12 +16,15 @@ export class TaskItem {
   taskId: number = 0;
   name: string = ""
   size: number = 0;
+  videoSize: number = 0;
   uploadedSize: number = 0;
   dateAdded: number = 0;
   dateModified: number = 0;
   uri: string = "";
   fileUri: string = "";
   remoteUri: string = "";
+  videoUri: string = "";
+  remoteVideoUri: string = "";
   photoType: photoAccessHelper.PhotoType = photoAccessHelper.PhotoType.IMAGE;
   subType: photoAccessHelper.PhotoSubtype = photoAccessHelper.PhotoSubtype.DEFAULT
   @Trace status: TaskItemStatus = TaskItemStatus.WAIT;
@@ -32,8 +35,6 @@ export class TaskItem {
   public task: Task = new Task();
   public webdav: WebDav = new WebDav()
   public config: Config = new Config()
-  public videoUri: string = ""
-  public videoRemoteUri: string = ""
 
   updateWebDav(webdav: WebDav, config: Config) {
     this.webdav = webdav;
@@ -41,17 +42,21 @@ export class TaskItem {
   }
 
   // 生成本地文件路径
-  makeFileUri(ctx: Context) {
+  makeUri(ctx: Context) {
     let context = ctx as common.UIAbilityContext;
     let filesDir = context.cacheDir;
-    let filePath = `${filesDir}/${this.name}`
+    let filePath = `${filesDir}/${this.name}`;
     this.fileUri = filePath;
-  }
-
-  makeRemoteUri() {
     const datePath = this.makeDatePath();
     let uri = `${datePath}/${this.name}`;
     this.remoteUri = uri;
+    if (this.photoType === photoAccessHelper.PhotoType.IMAGE &&
+      this.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
+      const tmpFe = splitFileExt(this.name);
+      const videoName = `${tmpFe[1]}.mp4`;
+      this.videoUri = this.fileUri.replace(this.name, videoName);
+      this.remoteVideoUri = this.remoteUri.replace(this.name, videoName);
+    }
   }
 
   makeDatePath() {
@@ -73,8 +78,11 @@ export class TaskItem {
     taskItem.uri = rs.getString(rs.getColumnIndex('uri'))
     taskItem.fileUri = rs.getString(rs.getColumnIndex('file_uri'))
     taskItem.remoteUri = rs.getString(rs.getColumnIndex('remote_uri'))
+    taskItem.videoUri = rs.getString(rs.getColumnIndex('video_uri'))
+    taskItem.remoteVideoUri = rs.getString(rs.getColumnIndex('remote_video_uri'))
     taskItem.failedReason = rs.getString(rs.getColumnIndex('failed_reason'))
     taskItem.size = rs.getLong(rs.getColumnIndex('size'))
+    taskItem.videoSize = rs.getLong(rs.getColumnIndex('video_size'))
     taskItem.uploadedSize = rs.getLong(rs.getColumnIndex('uploaded_size'))
     taskItem.photoType = rs.getLong(rs.getColumnIndex('photo_type'))
     taskItem.subType = rs.getLong(rs.getColumnIndex('sub_type'))
@@ -86,10 +94,6 @@ export class TaskItem {
     return taskItem;
   }
 
-  static getById(itemId: number) {
-
-  }
-
   async start() {
     this.status = TaskItemStatus.UPLOADING;
     this.updateStatus();
@@ -99,7 +103,8 @@ export class TaskItem {
   async success() {
     this.status = TaskItemStatus.SUCCESS;
     this.uploadedAt = Math.floor(Date.now() / 1000);
-    this.updateStatus();
+    await this.updateStatus();
+    await this.task.updateSuccess(1);
   }
 
   async failed(reason?: string) {
@@ -108,6 +113,7 @@ export class TaskItem {
       this.failedReason = reason;
     }
     await this.updateStatus();
+    await this.task.updateFailed(1);
   }
 
   async updateStatus() {
@@ -145,9 +151,12 @@ export class TaskItem {
       "name": this.name,
       "uri": this.uri,
       "size": this.size,
+      "video_size": this.videoSize,
       "uploaded_size": this.uploadedSize,
       "file_uri": this.fileUri,
       "remote_uri": this.remoteUri,
+      "video_uri": this.videoUri,
+      "remote_video_uri": this.remoteVideoUri,
       "failed_reason": this.failedReason,
       "photo_type": this.photoType,
       "sub_type": this.subType,
@@ -168,29 +177,10 @@ export class TaskItem {
     }
   }
 
-  // 上传该图片
-  // 1. 复制文件到沙箱中
-  // 2. dav创建文件目录
-  // 3. 检查文件是否存在，如果存在则检查状态是否完成，如果完成则跳过，如果未完成则删除
-  // 4. 上传文件
-  // 5. 修改状态
-  async upload(ctx: Context): Promise<boolean> {
-    if (this.status == TaskItemStatus.SUCCESS || this.status == TaskItemStatus.UPLOADING) {
-      return true;
-    }
-    await this.start();
+  async mkRemotePath(): Promise<boolean> {
     const dirList: string[] = this.remoteUri.split('/').filter(part => part.length > 0);
     dirList.pop();
-    const remoteUri = `${this.config.backupRootPath}${this.remoteUri}`
-    // 检查文件是否存在
-    const exists = await this.webdav.exists(remoteUri);
-    if (exists) {
-      await this.updateUploadedSize(this.size)
-      await this.task.updateUploadedSize(this.size);
-      await this.success();
-      return true;
-    }
-    let currentPath = `${this.config.backupRootPath}`;
+    let currentPath: string = strip(this.config.backupRootPath, '/');
     for (let dir of dirList) {
       // 创建目录
       currentPath += `/${dir}`;
@@ -204,51 +194,83 @@ export class TaskItem {
         return false;
       }
     }
-    let type = "default"
-    try {
-      // 如果时动态图，则获取图片和视频分别上传
-      if (this.photoType === photoAccessHelper.PhotoType.IMAGE &&
-        this.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
-        type = "video";
-        // 生成视频文件名称
-        const tmpFe = splitFileExt(this.name);
-        const videoName = `${tmpFe[1]}.mp4`;
-        this.videoUri = this.fileUri.replace(this.name, videoName);
-        this.videoRemoteUri = this.remoteUri.replace(this.name, videoName);
-        const rs = await Photos.saveMovingPhoto(ctx, this.uri, this.fileUri, this.videoUri);
+    return true;
+  }
 
-        if (rs !== 'success') {
-          // 保存动态图片失败
-          await this.failed(`无法保存动态图片${this.name}，原因：${rs}`);
-          return false;
-        }
-      } else {
-        copyPhoto(this.uri, this.size, this.fileUri);
-      }
-    } catch (e) {
-      console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
-      this.failed(e.message)
+  getFullRemoteUri(remoteUri: string, hasBaseUri: boolean = false) {
+    let url: string = "";
+    if (hasBaseUri) {
+      url = strip(this.webdav.server.server, '/')
+    }
+    const rootPath = strip(this.config.backupRootPath, '/');
+    url += `${rootPath}/${remoteUri}`;
+    return url;
+  }
+
+  // 上传该图片
+  async upload(ctx: Context): Promise<boolean> {
+    await this.start();
+    if (!(await this.mkRemotePath())) {
       return false;
     }
-    // 上传图片文件
-    const rs = await this.webdav.uploadTaskItem(this);
-    console.log(`上传结果：${rs}`)
-    if (rs != "success") {
-      await this.failed(rs);
-      return false;
-    } else {
-      await this.success()
+    let type = "default"
+    const remoteUri = this.getFullRemoteUri(this.remoteUri)
+    let remoteVideoUri: string = "";
+    let existsRR: number = await this.webdav.exists(this.getFullRemoteUri(remoteUri), this.size);
+    let existsVideoRR: number = 0;
+    // 如果时动态图，则获取图片和视频分别上传
+    if (this.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
+      type = "video";
+      remoteVideoUri = this.getFullRemoteUri(this.remoteVideoUri)
+      existsVideoRR = await this.webdav.exists(remoteVideoUri, this.videoSize);
     }
-    if (type === 'video') {
-      let b = await this.webdav.uploadTaskItem(this, 'video');
-      if (b !== 'success') {
-        // 失败了
-        this.failed(b)
+    if (existsRR === 0) {
+      // 不存在准备上传
+      try {
+        await copyPhoto(this.uri, this.size, this.fileUri);
+      } catch (e) {
+        console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
+        this.failed(e.message)
         return false;
       }
-      await this.success();
+    } else if (existsRR === 2) {
+      // 存在，不一致，删除远程文件
+      await this.webdav.delete(remoteUri)
+      existsRR = 0;
     }
+    if (existsRR === 0) {
+      // 上传图片文件
+      const rs = await this.webdav.uploadTaskItem(ctx, this);
+      if (rs != "success") {
+        await this.failed(rs);
+        return false;
+      }
+      existsRR = 1;
+    }
+    if (type === 'video') {
+      if (existsVideoRR === 2) {
+        await this.webdav.delete(remoteVideoUri);
+        existsRR = 0;
+      }
+      if (existsVideoRR === 0) {
+        let b = await this.webdav.uploadTaskItem(ctx, this, 'video');
+        if (b !== 'success') {
+          // 失败了
+          await this.failed(b);
+          return false;
+        }
+        existsVideoRR = 1;
+      }
+      if (existsVideoRR === 1) {
+        await this.updateUploadedSize(this.videoSize)
+        await this.task.updateUploadedSize(this.videoSize)
+      }
+    }
+    if (existsRR === 1) {
+      await this.updateUploadedSize(this.size)
+      await this.task.updateUploadedSize(this.size)
+    }
+    await this.success();
     return true;
-
   }
 }

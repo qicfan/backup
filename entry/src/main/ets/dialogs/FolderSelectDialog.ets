@@ -1,16 +1,14 @@
-import { IBestButton, IBestDialog, IBestLoading, IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
+import { IBestDialog, IBestLoading, IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
 import { BusinessError, deviceInfo } from "@kit.BasicServicesKit"
 import { SafeArea } from "../utils/safeArea";
 import { AppStorageV2, EditableLeftIconType, EditableTitleBar } from "@kit.ArkUI";
-import { RequestReturn, WebDav, WebDavResource } from "../utils/webdav";
+import { WebDav, WebDavResource } from "../utils/webdav";
 import { ServerConfig } from "../models/Server";
 import { Dialog } from "../utils/dialog";
 import { Config } from "../models/Config";
 
 @ComponentV2
 export struct FolderSelectDialog {
-  @Event close: () => void = () => {
-  }
   @Param rootPath: string = ""
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => new ServerConfig())!;
   @Local config: Config = AppStorageV2.connect(Config, "config", () => new Config())!;
@@ -32,10 +30,9 @@ export struct FolderSelectDialog {
       this.path = path.split('/')
     }
     this.webdav.getDirs(this.path.join('/')).then((rr) => {
-      this.dirList = rr.data;
+      this.dirList = rr.data ? rr.data : [];
       this.init = false;
-      // console.log(JSON.stringify(this.dirList));
-    }).catch((rr: RequestReturn) => {
+    }).catch(() => {
       this.init = false;
     })
   }
@@ -48,10 +45,10 @@ export struct FolderSelectDialog {
     }
     this.path = path;
     this.webdav.getDirs(href).then((rr) => {
-      console.log(JSON.stringify(rr))
-      this.dirList = rr.data
+      // console.log(JSON.stringify(rr))
+      this.dirList = rr.data ? rr.data : [];
       IBestToast.hide();
-    }).catch((rr: RequestReturn) => {
+    }).catch(() => {
       IBestToast.hide();
     })
 

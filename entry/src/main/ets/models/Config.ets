@@ -14,6 +14,7 @@ export class Config {
   @Trace dirRule: DirRule = DirRule.YMD;
   @Trace lowBatteryStop: LowBatteryStop = LowBatteryStop.YES;
   @Trace auto: AUTOBackup = AUTOBackup.YES;
+  @Trace first: number = 0;
   @Trace onlyWifi: OnlyWIFIBackup = OnlyWIFIBackup.YES;
   updatedAt: number = 0;
   createdAt: number = 0;
@@ -36,15 +37,17 @@ export class Config {
         this.lowBatteryStop = rs.getLong(rs.getColumnIndex("low_battery_stop"))
         this.onlyWifi = rs.getLong(rs.getColumnIndex("only_wifi_backup"))
         this.auto = rs.getLong(rs.getColumnIndex("auto"))
+        this.first = rs.getLong(rs.getColumnIndex("first"))
         this.updatedAt = rs.getLong(rs.getColumnIndex("updated_at"))
         this.createdAt = rs.getLong(rs.getColumnIndex("created_at"))
+        console.log(JSON.stringify(this))
         rs.close();
-        if (this.backupRootPath == "") return 3;
+        if (this.backupRootPath == "") return 2;
         return 1;
       }
     } catch (err) {
-      console.error(`Failed to add config. Code is ${err.code}, message is ${err.message}`);
-      return 2;
+      console.error(`Failed to get config. Code is ${err.code}, message is ${err.message}`);
+      return 0;
     }
 
   }
@@ -58,6 +61,7 @@ export class Config {
       "low_battery_stop": this.lowBatteryStop,
       "only_wifi_backup": this.onlyWifi,
       "auto": this.auto,
+      "first": this.first,
       "updated_at": Math.floor(Date.now() / 1000)
     };
     let predicates = new relationalStore.RdbPredicates("config");

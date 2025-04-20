@@ -31,3 +31,12 @@ export interface LocalUri {
   uri: string
   file_uri: string
 }
+export interface UploadEvent {
+  ACTION: "START" | "STOP" | "UPDATE" | "FINISH" // START, STOP
+  id: number // Task.id
+  baseUrl: string
+  username: string
+  password: string
+  backupRootPath: string
+  cacheFileDir: string
+}
