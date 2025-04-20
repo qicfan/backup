@@ -1,12 +1,5 @@
 {
   "apiType": "stageMode",
-  "buildOption": {
-    "sourceOption": {
-      "workers": [
-        './src/main/ets/workers/Uploader.ets'
-      ]
-    }
-  },
   "buildOptionSet": [
     {
       "name": "release",
