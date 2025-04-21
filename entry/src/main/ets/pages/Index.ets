@@ -66,7 +66,7 @@ struct Index {
       isModal: true,
       transition: TransitionEffect.move(TransitionEdge.BOTTOM).animation({ duration: 500, curve: Curve.Ease }),
       autoCancel: false,
-      onWillDismiss: (dismissDialogAction: DismissDialogAction)=>{
+      onWillDismiss: ()=>{
         return false;
       }
     });
@@ -269,6 +269,11 @@ struct Index {
     // 如果已经触发了停止，则不会开始执行新任务
     if (this.stop) {
       console.error(`stop=true，被其他操作中止，无法执行任务`);
+      IBestNotify.show({
+        message: "后台还有待处理的任务，请等待30秒后再重试或者关掉APP重进",
+        duration: 3000,
+        type: "warning"
+      })
       return false;
     }
     return true;
@@ -402,7 +407,7 @@ struct Index {
         reasonMap.set(3, "用户移除通知，取消任务")
         reasonMap.set(4, "数据传输速率低或长时间没有上传文件，取消任务")
         if (info.id === this.jobId) {
-          this.stopTaskEvent(task, true, `系统取消后台任务：${reasonMap.get(info.reason)}`);
+          this.stopTaskEvent(task, true, `系统原因=>${reasonMap.get(info.reason)}`);
         }
       });
       // 通过wantAgent模块下getWantAgent方法获取WantAgent对象
@@ -438,14 +443,29 @@ struct Index {
     console.log(`任务 ${task.id} 开始执行...`)
     let page = 1;
     let pageSize = 100;
+    let c = 0;
+    let preC = 0;
     const updateProgressHandleId = setInterval(() => {
       if (this.notifyId <= 0) {
         console.log("任务已结束，清除定时通知系统任务进度")
         clearInterval(updateProgressHandleId);
         return;
       }
+      const process: number = parseFloat((task.uploadedSize / task.size * 100).toFixed(2));
+      let a = process;
+      if (preC === 0) {
+        preC = process;
+      }
+      if (preC === process) {
+        c += 0.01;
+        a += c;
+      } else {
+        c = 0;
+        preC = 0;
+      }
+
       // 每秒更新一次任务进度
-      this.updateProcess(task);
+      this.updateProcess(task, a);
       return;
     }, 1000)
     let cancelReason: string = "";
@@ -480,6 +500,7 @@ struct Index {
         emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
       }
       if (this.stop) {
+        console.log(`收到暂停信号，跳出文件上传循环`)
         break;
       }
       if (items.length === pageSize) {
@@ -497,10 +518,9 @@ struct Index {
   }
 
   // 应用更新进度
-  updateProcess(task: Task) {
+  updateProcess(task: Task, process: number) {
     // 应用定义下载类通知模版
     const cur = task.success + task.failed
-    const process: number = Math.floor(task.uploadedSize / task.size * 100);
 
     let downLoadTemplate: notificationManager.NotificationTemplate = {
       name: 'downloadTemplate', // 当前只支持downloadTemplate，保持不变

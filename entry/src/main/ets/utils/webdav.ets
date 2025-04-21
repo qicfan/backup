@@ -147,10 +147,14 @@ export class WebDav {
 
   // 是否存在
   async exists(path: string, size: number) {
+    console.log(`查询${path}是否存在`)
     const req = new rcp.Request(path, "HEAD");
     const rr = await this.request(req);
     // 不存在
-    if (!rr.success) return 0;
+    if (!rr.success) {
+      console.log(`文件请求不成功，code: ${rr.statusCode}, msg: ${rr.message}`)
+      return 0;
+    }
     let remoteSize: number = 0;
     let remoteSizeArr: string | string[] | undefined =rr.headers['content-length'];
     if (remoteSizeArr === undefined) {

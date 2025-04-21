@@ -40,7 +40,6 @@ export class Config {
         this.first = rs.getLong(rs.getColumnIndex("first"))
         this.updatedAt = rs.getLong(rs.getColumnIndex("updated_at"))
         this.createdAt = rs.getLong(rs.getColumnIndex("created_at"))
-        console.log(JSON.stringify(this))
         rs.close();
         if (this.backupRootPath == "") return 2;
         return 1;

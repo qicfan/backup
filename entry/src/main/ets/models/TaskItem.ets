@@ -216,7 +216,7 @@ export class TaskItem {
     let type = "default"
     const remoteUri = this.getFullRemoteUri(this.remoteUri)
     let remoteVideoUri: string = "";
-    let existsRR: number = await this.webdav.exists(this.getFullRemoteUri(remoteUri), this.size);
+    let existsRR: number = await this.webdav.exists(remoteUri, this.size);
     let existsVideoRR: number = 0;
     // 如果时动态图，则获取图片和视频分别上传
     if (this.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
@@ -224,37 +224,47 @@ export class TaskItem {
       remoteVideoUri = this.getFullRemoteUri(this.remoteVideoUri)
       existsVideoRR = await this.webdav.exists(remoteVideoUri, this.videoSize);
     }
+    if (existsRR === 2) {
+      console.log(`${remoteUri}在服务器上存在，但是大小和本地不同，删除服务端文件。`)
+      // 存在，不一致，删除远程文件
+      await this.webdav.delete(remoteUri)
+      existsRR = 0;
+    }
     if (existsRR === 0) {
-      // 不存在准备上传
+      // 不存在,先复制文件
       try {
+        console.log(`先复制要上传的文件${this.uri} => ${this.fileUri}`)
         await copyPhoto(this.uri, this.size, this.fileUri);
       } catch (e) {
         console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
         this.failed(e.message)
         return false;
       }
-    } else if (existsRR === 2) {
-      // 存在，不一致，删除远程文件
-      await this.webdav.delete(remoteUri)
-      existsRR = 0;
-    }
-    if (existsRR === 0) {
       // 上传图片文件
+      console.log(`开始上传文件${remoteUri}，大小:${this.size}`)
       const rs = await this.webdav.uploadTaskItem(ctx, this);
       if (rs != "success") {
+        console.log(`${remoteUri}上传失败`)
         await this.failed(rs);
         return false;
       }
       existsRR = 1;
     }
+    if (existsRR === 1) {
+      await this.updateUploadedSize(this.size)
+      await this.task.updateUploadedSize(this.size)
+    }
     if (type === 'video') {
       if (existsVideoRR === 2) {
+        console.log(`动态图视频${remoteVideoUri}在服务器上存在，但是大小和本地不同，删除服务端文件。}`)
         await this.webdav.delete(remoteVideoUri);
         existsRR = 0;
       }
       if (existsVideoRR === 0) {
+        console.log(`开始上传文件${remoteVideoUri}，大小:${this.videoSize}`)
         let b = await this.webdav.uploadTaskItem(ctx, this, 'video');
         if (b !== 'success') {
+          console.log(`动态图视频${remoteVideoUri}上传失败`);
           // 失败了
           await this.failed(b);
           return false;
@@ -265,10 +275,6 @@ export class TaskItem {
         await this.updateUploadedSize(this.videoSize)
         await this.task.updateUploadedSize(this.videoSize)
       }
-    }
-    if (existsRR === 1) {
-      await this.updateUploadedSize(this.size)
-      await this.task.updateUploadedSize(this.size)
     }
     await this.success();
     return true;
