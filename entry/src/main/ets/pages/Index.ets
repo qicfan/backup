@@ -85,7 +85,7 @@ struct Index {
     });
     // 等开始收集相册内的新内容并生成任务
     emitter.on(Global.START_COLLECT_PHOTO_EVENT, () => {
-      this.startCreateTask()
+      this.startCreateTask().then()
     })
 
     // 开始执行未完成的任务
