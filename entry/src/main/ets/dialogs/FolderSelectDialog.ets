@@ -10,10 +10,10 @@ import { Config } from "../models/Config";
 @ComponentV2
 export struct FolderSelectDialog {
   @Param rootPath: string = ""
-  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => new ServerConfig())!;
-  @Local config: Config = AppStorageV2.connect(Config, "config", () => new Config())!;
+  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
+  @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
+  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
   @Local safeArea: SafeArea = AppStorageV2.connect(SafeArea, () => new SafeArea(0, 0))!;
-  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => new WebDav())!;
   @Local dirList: WebDavResource[] = [];
   @Local path: string[] = []
   @Local init: boolean = true;
@@ -76,51 +76,53 @@ export struct FolderSelectDialog {
 
   build() {
     Column() {
-      EditableTitleBar({
-        leftIconStyle: EditableLeftIconType.Back,
-        title: '选择保存路径',
-        menuItems: [
-          {
-            value: $r('sys.media.ohos_ic_public_add'),
-            isEnabled: true,
-            action: () => {
-              this.newDirDialog = true;
+      Column() {
+        EditableTitleBar({
+          leftIconStyle: EditableLeftIconType.Back,
+          title: '选择保存路径',
+          menuItems: [
+            {
+              value: $r('sys.media.ohos_ic_public_add'),
+              isEnabled: true,
+              action: () => {
+                this.newDirDialog = true;
+              }
             }
-          }
-        ],
-        onCancel: () => {
-          if (this.path.length <= 1) {
-            Dialog.closeDialog();
-            return true;
-          } else {
-            this.path.pop()
-            this.changeDir(this.path.join('/'))
-            return false;
-          }
-        },
-        onSave: () => {
-          let path = this.path.join('/')
-          if (!path.endsWith('/')) {
-            path += '/';
-          }
-          path += this.deviceName + '/';
-          this.config.backupRootPath = path;
-          this.config.update().then(() => {
-            // 在服务器上创建目录
-            try {
-              this.webdav.mkDir(path).then(() => {})
-            } catch (error) {
-              const err = error as BusinessError;
-              IBestNotify.show({
-                message: err.message,
-                duration: 3000,
-                type: 'warning'
-              })
+          ],
+          onCancel: () => {
+            if (this.path.length <= 1) {
+              Dialog.closeDialog();
+              return true;
+            } else {
+              this.path.pop()
+              this.changeDir(this.path.join('/'))
+              return false;
             }
-            Dialog.closeDialog();
-          })
-        }
-      })
+          },
+          onSave: () => {
+            let path = this.path.join('/')
+            if (!path.endsWith('/')) {
+              path += '/';
+            }
+            path += this.deviceName + '/';
+            this.config.backupRootPath = path;
+            this.config.update().then(() => {
+              // 在服务器上创建目录
+              try {
+                this.webdav.mkDir(path).then(() => {})
+              } catch (error) {
+                const err = error as BusinessError;
+                IBestNotify.show({
+                  message: err.message,
+                  duration: 3000,
+                  type: 'warning'
+                })
+              }
+              Dialog.closeDialog();
+            })
+          }
+        })
+      }
       Column() {
         if(!this.init) {
           List({ space: 20, initialIndex: 0 }) {

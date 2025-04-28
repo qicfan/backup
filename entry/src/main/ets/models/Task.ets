@@ -31,7 +31,7 @@ export class Task {
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.equalTo("id", this.id).limitAs(1)
     try {
-      const rs = await DB.dbInstance?.store?.query(predicates);
+      const rs = await DB.getInstance().store?.query(predicates);
       if (!rs || rs.rowCount <= 0) {
         return false
       }
@@ -92,7 +92,7 @@ export class Task {
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.equalTo("id", this.id)
     try {
-      await DB.dbInstance?.store?.update(updateBucket, predicates);
+      await DB.getInstance().store?.update(updateBucket, predicates);
     } catch (err) {
       console.error(`task update failed, code is ${err.code},message is ${err.message}`);
     }
@@ -106,7 +106,7 @@ export class Task {
       sql = `UPDATE ${Task.TABLE_NAME} SET success = success - ${count} WHERE id=?`
     }
     try {
-      await DB.dbInstance.store?.executeSql(sql, [this.id]);
+      await DB.getInstance().store?.executeSql(sql, [this.id]);
       await this.fetch();
     } catch (err) {
       console.error(`更新任务成功计数失败, code is ${err.code},message is ${err.message}`);
@@ -121,7 +121,7 @@ export class Task {
       sql = `UPDATE ${Task.TABLE_NAME} SET failed = failed - ${count} WHERE id=?`
     }
     try {
-      await DB.dbInstance.store?.executeSql(sql, [this.id]);
+      await DB.getInstance().store?.executeSql(sql, [this.id]);
       await this.fetch();
     } catch (err) {
       console.error(`更新任务失败计数失败, code is ${err.code},message is ${err.message}`);
@@ -138,7 +138,7 @@ export class Task {
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.equalTo("id", this.id)
     try {
-      await DB.dbInstance?.store?.update(updateBucket, predicates);
+      await DB.getInstance().store?.update(updateBucket, predicates);
     } catch (err) {
       console.error(`task uploaded size update failed, code is ${err.code},message is ${err.message}`);
     }
@@ -159,7 +159,7 @@ export class Task {
       "updated_at": this.updatedAt,
     };
     try {
-        await DB.dbInstance?.store?.insert('task', insertBucket);
+        await DB.getInstance().store?.insert('task', insertBucket);
       // console.info(`task Insert row: ${rowId}`);
     } catch (err) {
       console.error(`task Insert failed, code is ${err.code},message is ${err.message}`);
@@ -177,7 +177,7 @@ export class Task {
       .limitAs(pageSize)
       .offsetAs(offset)
     try {
-      const rs = await DB.dbInstance?.store?.query(predicates);
+      const rs = await DB.getInstance().store?.query(predicates);
       if (rs === undefined) {
         return [];
       }
@@ -200,7 +200,7 @@ export class Task {
   }
 
   // 查询任务详情
-  async getWaitItems(page: number = 1, pageSize: number = 100) {
+  async getWaitItems(page: number = 1, pageSize: number = 100): Promise<relationalStore.ResultSet | null> {
     const items: TaskItem[] = [];
     const offset = (page - 1) * pageSize;
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
@@ -212,24 +212,24 @@ export class Task {
       .orderByAsc('id')
     const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE task_id=? AND status IN (?, ?) AND uploaded_size < size ORDER BY id ASC LIMIT 0, ?`;
     try {
-      const rs = await DB.dbInstance?.store?.querySql(SQL, [this.id, TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, pageSize]);
+      const rs = await DB.getInstance().store?.querySql(SQL, [this.id, TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, pageSize]);
       if (rs === undefined) {
-        return [];
+        return null;
       }
       if (rs.rowCount <= 0) {
-        return [];
+        return null;
       }
-      while (rs.goToNextRow()) {
-        const taskItem = TaskItem.getInstance(rs);
-        taskItem.task = this;
-        items.push(taskItem)
-      }
-      rs.close();
-      return items
+      // while (rs.goToNextRow()) {
+      //   const taskItem = TaskItem.getInstance(rs);
+      //   taskItem.task = this;
+      //   items.push(taskItem)
+      // }
+      // rs.close();
+      return rs
     } catch (error) {
       let err = error as BusinessError;
       console.log(`${err.code} => ${err.message}`)
-      return [];
+      return null;
     }
   }
 
@@ -244,7 +244,7 @@ export class Task {
       .limitAs(1)
       .orderByAsc('id')
     try {
-      const rs = await DB.dbInstance?.store?.query(predicates);
+      const rs = await DB.getInstance().store?.query(predicates);
       if (rs === undefined || rs.rowCount <= 0) {
         return item;
       }
@@ -266,7 +266,7 @@ export class Task {
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.orderByDesc('id').limitAs(pageSize).offsetAs(offset)
     try {
-      const rs = await DB.dbInstance?.store?.query(predicates);
+      const rs = await DB.getInstance().store?.query(predicates);
       if (rs === undefined) {
         return [];
       }
@@ -304,7 +304,7 @@ export class Task {
     predicates.in("status", [TaskStatus.WAIT, TaskStatus.PROCESS]).orderByAsc('id').limitAs(1)
 
     try {
-      const rs = await DB.dbInstance?.store?.query(predicates);
+      const rs = await DB.getInstance().store?.query(predicates);
       if (!rs || rs.rowCount <= 0) {
         return undefined
       }
@@ -345,7 +345,7 @@ export class Task {
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.equalTo("status", TaskStatus.PROCESS)
     try {
-      await DB.dbInstance?.store?.update(updateBucket, predicates);
+      await DB.getInstance().store?.update(updateBucket, predicates);
     } catch (err) {
       console.error(`修正运行中的任务状态失败, code is ${err.code},message is ${err.message}`);
     }
@@ -365,7 +365,7 @@ export class Task {
     }
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
     predicates.orderByDesc('id').limitAs(1)
-    const rs = await DB.dbInstance?.store?.query(predicates)
+    const rs = await DB.getInstance().store?.query(predicates)
     if (rs === undefined || rs.rowCount <= 0) {
       lastId = 1;
     } else {

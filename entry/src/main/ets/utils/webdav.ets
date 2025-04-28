@@ -25,7 +25,16 @@ export class WebDavResource implements DavResource {
 
 export class WebDav {
   public session: rcp.Session | null = null;
-  public server: ServerConfig = new ServerConfig();
+  public server: ServerConfig = ServerConfig.getInstance();
+
+  private static _instance: WebDav | null = null;
+
+  static getInstance() {
+    if (WebDav._instance === null) {
+      WebDav._instance = new WebDav();
+    }
+    return WebDav._instance;
+  }
 
   constructor(serverConfig?: ServerConfig) {
     if (serverConfig !== undefined) {

@@ -39,6 +39,34 @@ export async function copyPhoto(uri: string, size: number, destFilePath: string)
   return true;
 }
 
+/**
+ * Copy the source image into sandbox.
+ * @param src - source image path
+ * @param path - sandbox path
+ * @returns Promise<string>
+ */
+export async function copyImg2Sandbox(src: string, path: string, size: number): Promise<boolean> {
+  // 检查文件是否存在，大小是否一致
+  let srcImage = await fileIo.open(src, fileIo.OpenMode.READ_ONLY);
+  let destImage = await fileIo.open(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+  let exists: boolean = false;
+  try {
+    let stat = await fileIo.stat(destImage.fd);
+    if(stat.size === size) {
+      exists = true;
+    }
+  } catch (e) {
+    console.log(`获取目标文件${path}的状态出错：code:${e.code}, msg:${e.message}}`)
+    exists = false;
+  }
+  if (!exists) {
+    await fileIo.copyFile(srcImage.fd, destImage.fd);
+  }
+  await fileIo.close(srcImage);
+  await fileIo.close(destImage);
+  return true;
+}
+
 
 export function deletePhoto(filePath: string) {
   if (!filePath) {

@@ -8,17 +8,23 @@ const STORE_CONFIG :relationalStore.StoreConfig = {
 };
 
 export class DB {
-  public static dbInstance: DB = new DB(); // DB的实例
-
   public store: relationalStore.RdbStore | null = null
-
   private isInit: boolean = false;
+  private static _instance: DB | null = null;
+
+  static getInstance() {
+    if (DB._instance === null) {
+      DB._instance = new DB();
+    }
+    return DB._instance;
+  }
+
   constructor() {
   }
 
   public static init(context: Context) {
     return new Promise((resolve: (rs: boolean) => void, reject: (reason: Error) => void) => {
-      if (DB.dbInstance.isInit) {
+      if (DB.getInstance().isInit) {
         return resolve(true);
       }
       relationalStore.getRdbStore(context, STORE_CONFIG, (err, store) => {
@@ -27,7 +33,7 @@ export class DB {
           return reject(err);
         }
         console.info('Succeeded in getting RdbStore.');
-        DB.dbInstance.store = store
+        DB.getInstance().store = store
         // 当数据库创建时，数据库默认版本为0
         if (store.version === 0) {
           const CREATE_CONFIG_TABLE = "CREATE TABLE config (\n" +
@@ -108,7 +114,7 @@ export class DB {
           // 设置数据库的版本，入参为大于0的整数
           store.version = 1;
         }
-        DB.dbInstance.isInit = true;
+        DB.getInstance().isInit = true;
         return resolve(true);
       })
     })

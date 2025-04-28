@@ -30,6 +30,7 @@ import { TaskFiles } from "../components/TaskFiles";
 import { TipDialog } from "../dialogs/TipDialog";
 import { Dialog } from "../utils/dialog";
 import { Agreement } from "../components/Agreement";
+import { relationalStore } from "@kit.ArkData";
 
 @Builder
 function buildTip(event: ()=>void) {
@@ -39,10 +40,10 @@ function buildTip(event: ()=>void) {
 @Entry
 @ComponentV2
 struct Index {
-  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => new ServerConfig())!;
-  @Local config: Config = AppStorageV2.connect(Config, "config", () => new Config())!;
-  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => new WebDav())!;
-  @Local global: Global = AppStorageV2.connect(Global, "global", () => new Global())!;
+  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
+  @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
+  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
+  @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   private ctxUIAbility: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack()
   @Local creatingTask: boolean = false;
@@ -267,7 +268,7 @@ struct Index {
       return false;
     }
     // 如果已经触发了停止，则不会开始执行新任务
-    if (this.stop) {
+    if (Global.PAUSE) {
       console.error(`stop=true，被其他操作中止，无法执行任务`);
       IBestNotify.show({
         message: "后台还有待处理的任务，请等待30秒后再重试或者关掉APP重进",
@@ -318,7 +319,7 @@ struct Index {
       return false;
     }
     console.log("开始执行任务：" + waitTask.id)
-    this.stop = false;
+    Global.PAUSE = false;
     this.global.processId = waitTask.id;
     if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")) {
       this.startBackground(waitTask);
@@ -368,7 +369,7 @@ struct Index {
       task = taskOrId;
     }
     if (pause) {
-      this.stop = true;
+      Global.PAUSE = true;
     }
     await this.stopTask(task, reason);
   }
@@ -381,8 +382,10 @@ struct Index {
       this.jobId = 0;
       await task.finish(reason);
     }
-    // 取消长时任务
-    backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
+    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")) {
+      // 取消长时任务
+      backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
+    }
     // 触发UI刷新
     emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
   }
@@ -440,7 +443,6 @@ struct Index {
     // 触发UI更新，显示任务进度
     emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
     // 对于上传下载类的长时任务，应用可以使用res中返回的notificationId来更新通知，比如发送带进度条的模板通知。
-
     // 将任务标记为开始执行
     await task.start();
     emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
@@ -449,73 +451,79 @@ struct Index {
     let pageSize = 100;
     let c = 0;
     let preC = 0;
-    const updateProgressHandleId = setInterval(() => {
-      if (this.notifyId <= 0) {
-        console.log("任务已结束，清除定时通知系统任务进度")
-        clearInterval(updateProgressHandleId);
-        return;
-      }
-      const process: number = parseFloat((task.uploadedSize / task.size * 100).toFixed(2));
-      let a = process;
-      if (preC === 0) {
-        preC = process;
-      }
-      if (preC === process) {
-        c += 0.01;
-        a += c;
-      } else {
-        c = 0;
-        preC = 0;
-      }
+    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")) {
+      const updateProgressHandleId = setInterval(() => {
+        if (this.notifyId <= 0) {
+          console.log("任务已结束，清除定时通知系统任务进度")
+          clearInterval(updateProgressHandleId);
+          return;
+        }
+        const process: number = parseFloat((task.uploadedSize / task.size * 100).toFixed(2));
+        let a = process;
+        if (preC === 0) {
+          preC = process;
+        }
+        if (preC === process) {
+          c += 0.01;
+          a += c;
+        } else {
+          c = 0;
+          preC = 0;
+        }
 
-      // 每秒更新一次任务进度
-      this.updateProcess(task, a);
-      return;
-    }, 1000)
+        // 每秒更新一次任务进度
+        this.updateProcess(task, a);
+        // 触发UI更新
+        emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
+        return;
+      }, 1000)
+    }
     let cancelReason: string = "";
     while (true) {
       await task.fetch()
-      const items: TaskItem[] = await task.getWaitItems(page, pageSize)
-      console.log(`第${page}页查询到${items.length}条数据`)
-      if (items.length === 0) {
+      const rs: relationalStore.ResultSet | null = await task.getWaitItems(page, pageSize)
+      let count: number = 0;
+      if (rs !== null) {
+        count = rs.rowCount;
+      }
+      console.log(`第${page}页查询到${count}条数据`)
+      if (count === 0) {
         console.log(`${page}页没有数据，跳出循环`);
         break;
       }
-      for (let item of items) {
-        if (this.stop) {
-          break;
-        }
-        if (!this.checkBattery()) {
-          // 电量低于15%，停止
-          cancelReason = "电量低于15%";
-          this.stop = true;
-          break;
-        }
-        if (!(await this.checkWifi())) {
-          // 非wifi网络，停止
-          cancelReason = "处于非WIFI网络";
-          this.stop = true;
-          break;
-        }
-        task.preUploadedSize = task.uploadedSize;
-        item.updateWebDav(this.webdav, this.config)
-        await item.upload(this.ctxUIAbility)
-        // 触发UI更新
-        emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
-      }
-      if (this.stop) {
+      // @TODO 启动10个文件同时上传
+      // for (let item of items) {
+      //   if (Global.PAUSE) {
+      //     break;
+      //   }
+      //   if (!this.checkBattery()) {
+      //     // 电量低于15%，停止
+      //     cancelReason = "电量低于15%";
+      //     Global.PAUSE = true;
+      //     break;
+      //   }
+      //   if (!(await this.checkWifi())) {
+      //     // 非wifi网络，停止
+      //     cancelReason = "处于非WIFI网络";
+      //     Global.PAUSE = true;
+      //     break;
+      //   }
+      //   task.preUploadedSize = task.uploadedSize;
+      //   await item.upload(this.ctxUIAbility)
+      // }
+      if (Global.PAUSE) {
         console.log(`收到暂停信号，跳出文件上传循环`)
         break;
       }
-      if (items.length === pageSize) {
+      if (count === pageSize) {
         page++;
       }
     }
-    console.log(`长时任务执行完毕，取消原因: ${cancelReason}，是否暂停:${this.stop}`)
+    console.log(`长时任务执行完毕，取消原因: ${cancelReason}，是否暂停:${Global.PAUSE}`)
     // 完成任务
     await this.stopTask(task, cancelReason);
-    this.stop = false;
-    if (!this.stop && this.config.auto == AUTOBackup.YES) {
+    Global.PAUSE = false;
+    if (!Global.PAUSE && this.config.auto == AUTOBackup.YES) {
       // 触发下一次执行
       emitter.emit(Global.START_WAIT_TASK_EVENT)
     }

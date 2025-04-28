@@ -8,7 +8,7 @@ import { SafeArea } from "../utils/safeArea";
 export struct TipDialog {
   @Event close: ()=>void = () => {}
   @Local safeArea: SafeArea = AppStorageV2.connect(SafeArea, () => new SafeArea(0, 0))!;
-  @Local config: Config = AppStorageV2.connect(Config, "config", () => new Config())!;
+  @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
 
   build() {
     Column() {

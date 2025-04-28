@@ -3,12 +3,12 @@ import { intl } from '@kit.LocalizationKit';
 import { relationalStore } from "@kit.ArkData";
 import { DB } from "./DB";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
-import { copyPhoto, splitFileExt, strip } from "../utils/tools";
-import { RequestReturn, WebDav } from "../utils/webdav";
+import { copyImg2Sandbox, copyPhoto, splitFileExt, strip } from "../utils/tools";
+import { WebDav } from "../utils/webdav";
 import { Config } from "./Config";
 import { Task } from "./Task";
-import { Photos } from "../utils/photos";
 import { common } from "@kit.AbilityKit";
+import { Global } from "./Global";
 
 @ObservedV2
 export class TaskItem {
@@ -33,8 +33,8 @@ export class TaskItem {
   uploadedAt: number = 0;
   static TABLE_NAME = 'task_items'
   public task: Task = new Task();
-  public webdav: WebDav = new WebDav()
-  public config: Config = new Config()
+  public webdav: WebDav = WebDav.getInstance()
+  public config: Config = Config.getInstance()
 
   updateWebDav(webdav: WebDav, config: Config) {
     this.webdav = webdav;
@@ -125,7 +125,7 @@ export class TaskItem {
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
     predicates.equalTo("id", this.id)
     try {
-      await DB.dbInstance?.store?.update(updateBucket, predicates);
+      await DB.getInstance().store?.update(updateBucket, predicates);
     } catch (err) {
       console.error(`task Insert failed, code is ${err.code},message is ${err.message}`);
     }
@@ -139,7 +139,7 @@ export class TaskItem {
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
     predicates.equalTo("id", this.id)
     try {
-      await DB.dbInstance?.store?.update(updateBucket, predicates);
+      await DB.getInstance().store?.update(updateBucket, predicates);
     } catch (err) {
       console.error(`task Insert failed, code is ${err.code},message is ${err.message}`);
     }
@@ -167,7 +167,7 @@ export class TaskItem {
       "date_modified": this.dateModified,
     };
     try {
-      await DB.dbInstance?.store?.insert(TaskItem.TABLE_NAME, insertBucket,
+      await DB.getInstance().store?.insert(TaskItem.TABLE_NAME, insertBucket,
         relationalStore.ConflictResolution.ON_CONFLICT_IGNORE);
       // console.info(`task item insert row: ${rowId}`);
       return true;
@@ -234,7 +234,8 @@ export class TaskItem {
       // 不存在,先复制文件
       try {
         console.log(`先复制要上传的文件${this.uri} => ${this.fileUri}`)
-        await copyPhoto(this.uri, this.size, this.fileUri);
+        // await copyPhoto(this.uri, this.size, this.fileUri);
+        await copyImg2Sandbox(this.uri, this.fileUri, this.size);
       } catch (e) {
         console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
         this.failed(e.message)
@@ -242,6 +243,7 @@ export class TaskItem {
       }
       // 上传图片文件
       console.log(`开始上传文件${remoteUri}，大小:${this.size}`)
+      if (Global.PAUSE) return false;
       const rs = await this.webdav.uploadTaskItem(ctx, this);
       if (rs != "success") {
         console.log(`${remoteUri}上传失败`)

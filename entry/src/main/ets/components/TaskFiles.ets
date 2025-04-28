@@ -9,7 +9,7 @@ import { emitter } from "@kit.BasicServicesKit";
 @ComponentV2
 export struct TaskFiles {
   @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack()
-  @Local global: Global = AppStorageV2.connect(Global, "global", () => new Global())!;
+  @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local task: Task = new Task();
   @Local list: TaskItem[] = [];
   @Local processItem: TaskItem | undefined = undefined;
