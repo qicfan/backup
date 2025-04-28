@@ -241,7 +241,7 @@ export class WebDav {
 
       // 将本地应用文件上传至网络服务器
       try {
-        const uploadTask: request.UploadTask = await request.uploadFile(context, uploadConfig)
+        const uploadTask: request.UploadTask = await request.uploadFile(context, uploadConfig);
         uploadTask.on('complete', (taskStates: Array<request.TaskState>) => {
           for (let i = 0; i < taskStates.length; i++) {
             let rr: RequestReturn = {
@@ -258,6 +258,7 @@ export class WebDav {
               rr.statusCode = taskStates[i].responseCode;
               rr.message = taskStates[i].message;
             }
+            uploadTask.delete().then()
             resolve(rr);
           }
         });
@@ -277,6 +278,30 @@ export class WebDav {
       }
     });
   }
+
+  // 根据文件大小来判断是否分块上传
+  async uploadTaskItem(ctx: Context, taskItem: TaskItem, type: string = "default"): Promise<string> {
+    let filePath: string = taskItem.fileUri;
+    let remoteUri: string = taskItem.getFullRemoteUri(taskItem.remoteUri, true);
+    if (type !== 'default') {
+      filePath = taskItem.videoUri;
+      remoteUri = taskItem.getFullRemoteUri(taskItem.remoteVideoUri, true);
+    }
+    const rr: RequestReturn = await this.uploadBySys(ctx, taskItem.name, remoteUri, filePath, (transferredSize: number) => {
+        if (type === 'default') {
+          taskItem.updateUploadedSize(transferredSize)
+          taskItem.task.updateUploadedSize(transferredSize)
+        }
+    });
+    deletePhoto(filePath);
+    console.log(`${remoteUri}上传成功，删除本地临时文件：${filePath}`)
+    if (rr.success) {
+      return 'success';
+    } else {
+      return rr.message;
+    }
+  }
+
 
   // 解析dav xml
   parseXml(xmlStr: string | null): WebDavResource[] {
@@ -336,28 +361,5 @@ export class WebDav {
     that.parseXml(options);
     items.splice(0, 1)
     return items;
-  }
-
-  // 根据文件大小来判断是否分块上传
-  async uploadTaskItem(ctx: Context, taskItem: TaskItem, type: string = "default"): Promise<string> {
-    let filePath: string = taskItem.fileUri;
-    let remoteUri: string = taskItem.getFullRemoteUri(taskItem.remoteUri, true);
-    if (type !== 'default') {
-      filePath = taskItem.videoUri;
-      remoteUri = taskItem.getFullRemoteUri(taskItem.remoteVideoUri, true);
-    }
-    const rr: RequestReturn = await this.uploadBySys(ctx, taskItem.name, remoteUri, filePath, (transferredSize: number) => {
-        if (type === 'default') {
-          taskItem.updateUploadedSize(transferredSize)
-          taskItem.task.updateUploadedSize(transferredSize)
-        }
-    });
-    deletePhoto(filePath);
-    console.log(`${remoteUri}上传成功，删除本地临时文件：${filePath}`)
-    if (rr.success) {
-      return 'success';
-    } else {
-      return rr.message;
-    }
   }
 }

@@ -320,7 +320,11 @@ struct Index {
     console.log("开始执行任务：" + waitTask.id)
     this.stop = false;
     this.global.processId = waitTask.id;
-    this.startBackground(waitTask)
+    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")) {
+      this.startBackground(waitTask);
+    } else {
+      // @TODO 不通过后台任务形式启动任务，弹框提示用户不要离开该界面
+    }
     return true;
   }
 
