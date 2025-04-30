@@ -20,20 +20,21 @@ export async function copyPhoto(uri: string, size: number, destFilePath: string)
     console.log(`打开${uri}失败, code:${e.code}. msg:${e.message}`)
     return false;
   }
-  let buffSize = 4096;
-  let buffer: ArrayBuffer = new ArrayBuffer(Math.min(buffSize, size));
-  let off: number = 0;
-  let len: number = await fileIo.read(file.fd, buffer, { offset: off, length: buffSize });
-  let readLen: number = 0;
-  while (len > 0) {
-    readLen += len;
-    await fileIo.write(destPath.fd, buffer, { offset: off, length: buffSize })
-    off = off + len;
-    if ((size - readLen) < buffSize) {
-      buffSize = size - readLen;
-    }
-    len = await fileIo.read(file.fd, buffer, { offset: off, length: buffSize });
-  }
+  await fileIo.copyFile(file.fd, destPath.fd);
+  // let buffSize = 4096;
+  // let buffer: ArrayBuffer = new ArrayBuffer(Math.min(buffSize, size));
+  // let off: number = 0;
+  // let len: number = await fileIo.read(file.fd, buffer, { offset: off, length: buffSize });
+  // let readLen: number = 0;
+  // while (len > 0) {
+  //   readLen += len;
+  //   await fileIo.write(destPath.fd, buffer, { offset: off, length: buffSize })
+  //   off = off + len;
+  //   if ((size - readLen) < buffSize) {
+  //     buffSize = size - readLen;
+  //   }
+  //   len = await fileIo.read(file.fd, buffer, { offset: off, length: buffSize });
+  // }
   await fileIo.close(file.fd)
   await fileIo.close(destPath.fd)
   return true;
