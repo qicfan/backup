@@ -26,6 +26,24 @@ export class Task {
   public preUploadedSize = 0;
   static TABLE_NAME = 'task'
 
+  get realUploadedSize(): number {
+    const SQL = `SELECT SUM(uploaded_size) as uploaded_size FROM ${TaskItem.TABLE_NAME} WHERE task_id=?`;
+    try {
+      const rs = DB.getInstance().store?.querySqlSync(SQL, [this.id]);
+      if (rs === undefined || rs.rowCount <= 0) {
+        return 0
+      }
+      let c: number = 0;
+      rs.goToNextRow();
+      c = rs.getLong(rs.getColumnIndex('uploaded_size'))
+      rs.close();
+      return c;
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+      return 0;
+    }
+  }
   // 从数据库中查询最新的值
   async fetch() {
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
@@ -46,6 +64,8 @@ export class Task {
         this.cancelReason = rs.getString(rs.getColumnIndex('cancel_reason'))
         this.createdAt = rs.getLong(rs.getColumnIndex('created_at'))
         this.updatedAt = rs.getLong(rs.getColumnIndex('updated_at'))
+        this.success = this.suc;
+        this.failed = this.fail;
         return true;
       }
     } catch (e) {
@@ -66,6 +86,55 @@ export class Task {
   async start() {
     this.status = TaskStatus.PROCESS;
     await this.updateStatus();
+  }
+
+  get suc() {
+    const SQL = `SELECT COUNT(id) as suc FROM ${TaskItem.TABLE_NAME} WHERE task_id=? AND status=?`;
+    try {
+      const rs = DB.getInstance().store?.querySqlSync(SQL, [this.id, TaskItemStatus.SUCCESS]);
+      if (rs === undefined || rs.rowCount <= 0) {
+        return 0
+      }
+      let c: number = 0;
+      rs.goToNextRow();
+      c = rs.getLong(rs.getColumnIndex('suc'))
+      rs.close();
+      return c;
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+      return 0;
+    }
+  }
+
+  get fail() {
+    const SQL = `SELECT COUNT(id) as suc FROM ${TaskItem.TABLE_NAME} WHERE task_id=? AND status=?`;
+    try {
+      const rs = DB.getInstance().store?.querySqlSync(SQL, [this.id, TaskItemStatus.FAIL]);
+      if (rs === undefined || rs.rowCount <= 0) {
+        return 0
+      }
+      let c: number = 0;
+      rs.goToNextRow();
+      c = rs.getLong(rs.getColumnIndex('suc'))
+      rs.close();
+      return c;
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+      return 0;
+    }
+  }
+
+  // 是否可以完成
+  // 成功+失败=总数即可完成
+  async canFinish() {
+    if ((this.suc + this.fail) !== this.total) {
+      return ;
+    }
+    this.status = TaskStatus.FINISH;
+    await this.updateStatus();
+    return;
   }
 
   async finish(reason?: string): Promise<void> {
@@ -201,30 +270,16 @@ export class Task {
 
   // 查询任务详情
   async getWaitItems(page: number = 1, pageSize: number = 100): Promise<relationalStore.ResultSet | null> {
-    const items: TaskItem[] = [];
     const offset = (page - 1) * pageSize;
-    let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
-    predicates.equalTo("task_id", this.id)
-      .and()
-      .in("status", [TaskItemStatus.WAIT, TaskItemStatus.UPLOADING])
-      .limitAs(pageSize)
-      .offsetAs(offset)
-      .orderByAsc('id')
-    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE task_id=? AND status IN (?, ?) AND uploaded_size < size ORDER BY id ASC LIMIT 0, ?`;
+    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE task_id=? AND status IN (?, ?) AND uploaded_size < size ORDER BY id ASC LIMIT ?, ?`;
     try {
-      const rs = await DB.getInstance().store?.querySql(SQL, [this.id, TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, pageSize]);
+      const rs = await DB.getInstance().store?.querySql(SQL, [this.id, TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, offset, pageSize]);
       if (rs === undefined) {
         return null;
       }
       if (rs.rowCount <= 0) {
         return null;
       }
-      // while (rs.goToNextRow()) {
-      //   const taskItem = TaskItem.getInstance(rs);
-      //   taskItem.task = this;
-      //   items.push(taskItem)
-      // }
-      // rs.close();
       return rs
     } catch (error) {
       let err = error as BusinessError;
@@ -261,6 +316,43 @@ export class Task {
     }
   }
 
+  static getInstance(rs: relationalStore.ResultSet) {
+    const task = new Task()
+    task.id = rs.getLong(rs.getColumnIndex('id'))
+    task.type = rs.getLong(rs.getColumnIndex('type'))
+    task.size = rs.getLong(rs.getColumnIndex('size'))
+    task.uploadedSize = rs.getLong(rs.getColumnIndex('uploaded_size'))
+    task.total = rs.getLong(rs.getColumnIndex('total'))
+    task.success = rs.getLong(rs.getColumnIndex('success'))
+    task.failed = rs.getLong(rs.getColumnIndex('failed'))
+    task.status = rs.getLong(rs.getColumnIndex('status'))
+    task.cancelReason = rs.getString(rs.getColumnIndex('cancel_reason'))
+    task.createdAt = rs.getLong(rs.getColumnIndex('created_at'))
+    task.updatedAt = rs.getLong(rs.getColumnIndex('updated_at'))
+    return task;
+  }
+
+  static async getById(id: number) {
+    let item: Task | undefined = undefined;
+    let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
+    predicates.equalTo("id", id)
+    try {
+      const rs = await DB.getInstance().store?.query(predicates);
+      if (rs === undefined || rs.rowCount <= 0) {
+        return item;
+      }
+      while (rs.goToNextRow()) {
+        item = Task.getInstance(rs);
+      }
+      rs.close();
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+    } finally {
+      return item;
+    }
+  }
+
   static async getList(page: number = 1, pageSize: number = 20) {
     const offset = (page - 1) * pageSize;
     let predicates = new relationalStore.RdbPredicates(Task.TABLE_NAME);
@@ -275,19 +367,8 @@ export class Task {
       }
       const items: Task[] = []
       while (rs.goToNextRow()) {
-        const taskItem = new Task()
-        taskItem.id = rs.getLong(rs.getColumnIndex('id'))
-        taskItem.type = rs.getLong(rs.getColumnIndex('type'))
-        taskItem.size = rs.getLong(rs.getColumnIndex('size'))
-        taskItem.uploadedSize = rs.getLong(rs.getColumnIndex('uploaded_size'))
-        taskItem.total = rs.getLong(rs.getColumnIndex('total'))
-        taskItem.success = rs.getLong(rs.getColumnIndex('success'))
-        taskItem.failed = rs.getLong(rs.getColumnIndex('failed'))
-        taskItem.status = rs.getLong(rs.getColumnIndex('status'))
-        taskItem.cancelReason = rs.getString(rs.getColumnIndex('cancel_reason'))
-        taskItem.createdAt = rs.getLong(rs.getColumnIndex('created_at'))
-        taskItem.updatedAt = rs.getLong(rs.getColumnIndex('updated_at'))
-        items.push(taskItem)
+        const task = Task.getInstance(rs);
+        items.push(task)
       }
       rs.close();
       return items

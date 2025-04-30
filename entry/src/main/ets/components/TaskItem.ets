@@ -14,7 +14,7 @@ export struct TaskItem {
 
   @Computed
   get process() {
-    return parseFloat((this.task.uploadedSize / this.task.size * 100).toFixed(2))
+    return parseFloat((this.task.realUploadedSize / this.task.size * 100).toFixed(2))
   }
 
   @Computed
@@ -33,6 +33,10 @@ export struct TaskItem {
     emitter.on(Global.UPDATE_TASK_EVENT, (data) => {
       this.updateTask(data?.data?.id);
     })
+  }
+
+  aboutToDisappear(): void {
+    emitter.off(Global.UPDATE_TASK_EVENT);
   }
 
   updateTask(id: number) {

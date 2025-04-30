@@ -25,6 +25,10 @@ export struct TaskFiles {
 
   }
 
+  aboutToDisappear(): void {
+    emitter.off(Global.UPDATE_TASK_EVENT);
+  }
+
   intervalUpdate() {
     emitter.on(Global.UPDATE_TASK_EVENT, () => {
       this.getData();

@@ -69,12 +69,12 @@ export struct TaskFileItem {
       message: "请确认是否重新上传该图片？",
       showCancelButton: true,
       onConfirm: async () => {
-        const rs = await this.fileItem.upload(getContext(this));
-        if (rs) {
-          await this.fileItem.task.updateSuccess(1);
-          await this.fileItem.task.updateFailed(-1);
-          emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: this.fileItem.taskId } })
-        }
+        // const rs = await this.fileItem.upload(getContext(this));
+        // if (rs) {
+        //   await this.fileItem.task.updateSuccess(1);
+        //   await this.fileItem.task.updateFailed(-1);
+        //   emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: this.fileItem.taskId } })
+        // }
       }
     })
   }

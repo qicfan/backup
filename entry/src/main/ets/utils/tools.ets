@@ -1,8 +1,11 @@
 import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { connection } from '@kit.NetworkKit';
-import { batteryInfo, BusinessError } from '@kit.BasicServicesKit';
+import { batteryInfo, BusinessError, request } from '@kit.BasicServicesKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
+import { UploadItemSendable } from '../models/UploadItemSendable';
+import { RequestReturn } from './webdav';
+import { common, sendableContextManager } from '@kit.AbilityKit';
 
 export async function copyPhoto(uri: string, size: number, destFilePath: string) {
   let destPath: fileIo.File;

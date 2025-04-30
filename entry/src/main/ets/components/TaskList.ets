@@ -24,6 +24,10 @@ export struct TaskList {
     });
   }
 
+  aboutToDisappear(): void {
+    emitter.off(Global.COLLECT_PHOTO_FINISH_EVENT);
+  }
+
   async getList(direction: string) {
     if (direction == 'pull') {
       this.page = 1;
