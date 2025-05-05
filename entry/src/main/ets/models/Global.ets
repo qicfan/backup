@@ -25,6 +25,7 @@ export class Global {
   static BACKUP_UPLOAD_WORKER_IDLE = 'BACKUP.UPLOAD.WORKER.IDLE'; // 有上传线程空闲
   static BACKUP_COPY_WORKER_IDLE = 'BACKUP.COPY.WORKER.IDLE'; // 有上传线程空闲
   static BACKUP_COPY_FINISH = 'BACKUP.COPY.FINISH'; // 文件复制完成事件
+  static BACKUP_TASK_FINISH = "BACKUP.TASK.FINISH"; // 备份任务已完成
   static BACKUP_PAUSE = 'BACKUP.PAUSE'; // 暂停事件
   static CHUNK_SIZE = 5368709120; // 只能支持5G以内的文件传输，否则会因为读取大文件内存溢出。
   static PAUSE = false; // 是否暂停任务

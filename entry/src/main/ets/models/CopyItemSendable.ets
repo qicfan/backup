@@ -18,6 +18,7 @@ export class CopyItemSendable {
     this.sendableContext = sendableContextManager.convertFromContext(context);
     this.taskItemId = taskItem.id;
     this.photoType = taskItem.photoType;
+    this.subType = taskItem.subType;
     this.imageUri = taskItem.uri;
     this.fileUri = taskItem.fileUri;
     this.videoUri = taskItem.videoUri;

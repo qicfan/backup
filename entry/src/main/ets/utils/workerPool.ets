@@ -1,7 +1,7 @@
 import { ErrorEvent, MessageEvents, worker } from "@kit.ArkTS";
 import { UploadItemSendable } from "../models/UploadItemSendable";
 import { emitter } from "@kit.BasicServicesKit";
-import { TaskItemStatus, WorkerMessage } from "../typing";
+import { CopyWorkerMessage, TaskItemStatus, WorkerMessage } from "../typing";
 import { Task } from "../models/Task";
 import { TaskItem } from "../models/TaskItem";
 import { Global } from "../models/Global";
@@ -19,50 +19,65 @@ export class UploadWorkerItem {
     this.workerInstance = workerInstance;
     workerInstance.onmessage = (e: MessageEvents): void => {
       // data：worker线程发送的信息
-      console.log(`收到上传完成消息，结果：${JSON.stringify(e.data)}`)
+      console.log(`收到上传回调消息，结果：${JSON.stringify(e.data)}`)
       let data: WorkerMessage = e.data;
       if (this.uploadItem === undefined) {
         this.isIdle = true;
         return;
       }
-      if (data.action === "FINISH") {
-        this.taskItem?.success().then(() => {
-          this.task?.canFinish().then(() => {
-            emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: this.task?.id } })
+      const taskItemId = data.taskItemId;
+      const taskItem = new TaskItem();
+      taskItem.id = taskItemId;
+      taskItem.fetch().then(() => {
+        const task = new Task();
+        task.id = taskItem.taskId;
+        task.fetch().then(async () => {
+          if (data.action === "UPDATE_PROGRESS") {
+            await taskItem.updateUploadedSize(data.uploadedSize ? data.uploadedSize : 0);
+            return ;
+          }
+          if (data.action === "FINISH") {
+            if (data.type === 2) {
+              await taskItem.updateUploadedSize(taskItem.size + taskItem.videoSize).then();
+            } else {
+              await taskItem.updateUploadedSize(taskItem.size);
+            }
+            await taskItem.success()
+            console.log(`文件${taskItem.id} 已完成，状态: ${taskItem.status}, 已上传：${taskItem.uploadedSize}`)
+            const rs: boolean = await task?.canFinish()
+            console.log(`任务${task.id} 已检查是否完成，状态: ${task.status},成功：${task.success}, 失败:${task.failed}, 已上传字节数：${task.realUploadedSize}，总字节数：${task.size}`)
             // 通知主线程有任务空闲
             this.resetProp();
+            emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE);
+            if (rs) {
+              emitter.emit(Global.BACKUP_TASK_FINISH, {data: {taskId: task.id}})
+            }
+            return ;
+          }
+          if (data.action === "ERROR") {
+            // 上传发生错误
+            await taskItem.failed(data.message);
+            await task.canFinish()
+            this.resetProp();
+            // 通知主线程有任务空闲
             emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE)
-
-          })
-        });
-      } else if (data.action === "ERROR") {
-        // 上传发生错误
-        this.taskItem?.failed(data.message);
-        this.task?.canFinish().then(() => {
-          emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: this.task?.id } })
-          this.resetProp();
-          // 通知主线程有任务空闲
-          emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE)
-        });
-      } else if (data.action === "UPDATE_PROGRESS") {
-        this.taskItem?.updateUploadedSize(data.uploadedSize ? data.uploadedSize : 0);
-        emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: this.task?.id } })
-      } else {
-        this.resetProp();
-        // 通知主线程有任务空闲
-        emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE)
-      }
-
+          } else {
+            this.resetProp();
+            // 通知主线程有任务空闲
+            emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE)
+          }
+        })
+      })
     }
     // 在调用terminate后，执行回调onexit
-    workerInstance.onexit = () => {
+    workerInstance.onexit = async () => {
       console.log("main thread terminate");
       // 如果任务不是完成，则将任务改为未开始
-      this.task?.fetch();
-      this.taskItem?.fetch();
-      if (this.taskItem?.status !== TaskItemStatus.SUCCESS) {
-        this.taskItem?.failed("任务被暂停");
-      }
+      // await this.task?.fetch();
+      // await this.taskItem?.fetch();
+      // if (this.taskItem?.status !== TaskItemStatus.SUCCESS) {
+      //   await this.taskItem?.failed("任务被暂停");
+      // }
     }
     workerInstance.onerror = (err: ErrorEvent) => {
       console.error("main error message " + err.message);
@@ -105,12 +120,28 @@ export class CopyImageWorkItem {
   init(workerInstance: worker.ThreadWorker) {
     this.workerInstance = workerInstance;
     workerInstance.onmessage = (e: MessageEvents): void => {
+      const copyWorkMsg: CopyWorkerMessage = e.data;
+      console.log(`收到复制文件回调消息，结果：${JSON.stringify(copyWorkMsg)}`)
       if (e.data) {
-        // console.log(`收到复制完成消息，将该任务放入上传队列，${e.data}`)
-        this.isIdle = true;
-        this.taskItem = undefined;
-        emitter.emit(Global.BACKUP_COPY_FINISH, {data: {taskItemId: e.data}})
-        emitter.emit(Global.BACKUP_COPY_WORKER_IDLE)
+        // 更新视频文件大小
+        const taskItemId: number = copyWorkMsg.taskItemId;
+        const taskItem = new TaskItem();
+        taskItem.id = taskItemId;
+        taskItem.fetch().then(() => {
+          // 更新文件大小
+          if (copyWorkMsg.imageSize != taskItem.size || copyWorkMsg.videoSize != this.taskItem?.videoSize) {
+            console.log(`更新文件大小${taskItem.id} => size: ${copyWorkMsg.imageSize}, videoSize: ${copyWorkMsg.videoSize}`)
+            taskItem.updateSize(copyWorkMsg.imageSize, copyWorkMsg.videoSize).then(() => {
+              this.resetProp();
+              emitter.emit(Global.BACKUP_COPY_FINISH, {data: {taskItemId: copyWorkMsg.taskItemId}})
+              emitter.emit(Global.BACKUP_COPY_WORKER_IDLE)
+            })
+          } else {
+            this.resetProp();
+            emitter.emit(Global.BACKUP_COPY_FINISH, {data: {taskItemId: copyWorkMsg.taskItemId}});
+            emitter.emit(Global.BACKUP_COPY_WORKER_IDLE)
+          }
+        })
       }
     }
     // 在调用terminate后，执行回调onexit
@@ -147,6 +178,7 @@ export class WorkerPool {
   max: number = 10; // 最大进程数
   min: number = 0; // 最小进程数
   current: number = 0; // 当前进程数
+  copyCurrent: number = 0; // 当前进程数
   workerFileUri: string = ""; // worker路径
   workerItems: Array<UploadWorkerItem> = [];
   copyWorkerItems: Array<CopyImageWorkItem> = [];
@@ -173,9 +205,8 @@ export class WorkerPool {
       this.checkCopyIdle();
       return true;
     }
-    if (this.current < this.max) {
+    if (this.copyCurrent < this.max) {
       // 创建一个新线程
-      // console.log(`新建线程，执行taskItem: ${taskItem.id}`)
       const copyWorkerItem = this.newCopyItem();
       copyWorkerItem.execute(taskItem);
       this.checkCopyIdle();
@@ -241,7 +272,7 @@ export class WorkerPool {
     const item = new CopyImageWorkItem();
     item.init(new worker.ThreadWorker(this.workerFileUri));
     this.copyWorkerItems.push(item);
-    this.current += 1;
+    this.copyCurrent += 1;
     return item;
   }
 
@@ -271,15 +302,34 @@ export class WorkerPool {
           newItems.push(item);
           continue;
         }
-        if (this.current > this.min) {
+        if (this.copyCurrent > this.min) {
           item.destroy();
-          this.current--;
+          this.copyCurrent--;
           continue;
         }
         newItems.push(item);
       }
       this.copyWorkerItems = newItems;
     }
+  }
+
+  // 空闲的复制线程数
+  idleCopyCount() {
+    let count: number = 0;
+    for (let i=0; i<this.copyWorkerItems.length; i ++) {
+      const item = this.copyWorkerItems[i];
+      if (item.isIdle) count ++;
+    }
+    return count;
+  }
+  // 空闲的上传线程数
+  idleUploadCount() {
+    let count: number = 0;
+    for (let i=0; i<this.workerItems.length; i ++) {
+      const item = this.workerItems[i];
+      if (item.isIdle) count ++;
+    }
+    return count;
   }
 
 }

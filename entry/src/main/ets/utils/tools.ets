@@ -1,11 +1,8 @@
 import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { connection } from '@kit.NetworkKit';
-import { batteryInfo, BusinessError, request } from '@kit.BasicServicesKit';
+import { batteryInfo, BusinessError } from '@kit.BasicServicesKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
-import { UploadItemSendable } from '../models/UploadItemSendable';
-import { RequestReturn } from './webdav';
-import { common, sendableContextManager } from '@kit.AbilityKit';
 
 export async function copyPhoto(uri: string, size: number, destFilePath: string) {
   let destPath: fileIo.File;
@@ -23,20 +20,7 @@ export async function copyPhoto(uri: string, size: number, destFilePath: string)
     console.log(`打开${uri}失败, code:${e.code}. msg:${e.message}`)
     return false;
   }
-  let buffSize = 4096;
-  let buffer: ArrayBuffer = new ArrayBuffer(Math.min(buffSize, size));
-  let off: number = 0;
-  let len: number = await fileIo.read(file.fd, buffer, { offset: off, length: buffSize });
-  let readLen: number = 0;
-  while (len > 0) {
-    readLen += len;
-    await fileIo.write(destPath.fd, buffer, { offset: off, length: buffSize })
-    off = off + len;
-    if ((size - readLen) < buffSize) {
-      buffSize = size - readLen;
-    }
-    len = await fileIo.read(file.fd, buffer, { offset: off, length: buffSize });
-  }
+  await fileIo.copyFile(file.fd, destPath.fd);
   await fileIo.close(file.fd)
   await fileIo.close(destPath.fd)
   return true;
@@ -50,8 +34,20 @@ export async function copyPhoto(uri: string, size: number, destFilePath: string)
  */
 export async function copyImg2Sandbox(src: string, path: string, size: number): Promise<boolean> {
   // 检查文件是否存在，大小是否一致
-  let srcImage = await fileIo.open(src, fileIo.OpenMode.READ_ONLY);
-  let destImage = await fileIo.open(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+  let srcImage: fileIo.File;
+  let destImage: fileIo.File;
+  try {
+    srcImage = await fileIo.open(src, fileIo.OpenMode.READ_ONLY);
+  } catch (e) {
+    console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`);
+    return false;
+  }
+  try {
+    destImage = await fileIo.open(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+  } catch (e) {
+    console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`);
+    return false;
+  }
   let exists: boolean = false;
   try {
     let stat = await fileIo.stat(destImage.fd);
@@ -63,15 +59,20 @@ export async function copyImg2Sandbox(src: string, path: string, size: number): 
     exists = false;
   }
   if (!exists) {
-    await fileIo.copyFile(srcImage.fd, destImage.fd);
+    try {
+      await fileIo.copyFile(srcImage.fd, destImage.fd);
+    } catch (e) {
+      console.error(`复制文件线程: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`)
+    }
+  } else {
+    console.log(`复制文件线程: ${path}已存在`)
   }
   await fileIo.close(srcImage);
   await fileIo.close(destImage);
   return true;
 }
 
-
-export function deletePhoto(filePath: string) {
+export function deleteFile(filePath: string) {
   if (!filePath) {
     return;
   }
@@ -218,6 +219,7 @@ export async function calculateFileHash(fileStream: fileIo.Stream, size: number)
     return "";
   }
 }
+
 export function strip(str: string, trip: string) {
   return str.endsWith(trip) ? str.slice(0, -1) : str;
 }

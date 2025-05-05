@@ -3,9 +3,11 @@ import { UploadItemSendable } from '../models/UploadItemSendable';
 import { fileIo } from '@kit.CoreFileKit';
 import { common, sendableContextManager } from '@kit.AbilityKit';
 import { BusinessError, emitter, request } from '@kit.BasicServicesKit';
-import { strip } from '../utils/tools';
-import { WebDav } from '../utils/webdav';
+import { deleteFile, getMimeTypeFromExtension, strip } from '../utils/tools';
+import { RequestReturn, WebDav } from '../utils/webdav';
 import { ServerConfig } from '../models/Server';
+import { rcp } from '@kit.RemoteCommunicationKit';
+import { SERVER_AUTH_FAILED_EVENT } from '../typing';
 
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
 
@@ -19,15 +21,15 @@ workerPort.onmessage = (event: MessageEvents) => {
   console.log(`上传线程收到消息：${JSON.stringify(event.data)}`)
   doTask(event.data).then((rs) => {
     if (rs === "SUCCESS") {
-      workerPort.postMessage({action: "FINISH", code: 200, message: "", taskItemId: event.data.taskItemId});
+      workerPort.postMessage({action: "FINISH", code: 200, message: "", taskItemId: event.data.taskItemId, type: event.data.type});
     } else if (rs === "FILE NOT EXISTS"){
-      workerPort.postMessage({action: "FILE_NOT_EXISTS", code: 404, message: "本地临时文件不存在", taskItemId: event.data.taskItemId});
+      workerPort.postMessage({action: "FILE_NOT_EXISTS", code: 404, message: "本地临时文件不存在", taskItemId: event.data.taskItemId, type: event.data.type});
     } else {
-      workerPort.postMessage({action: "ERROR", code: 0, message: event.data.message, taskItemId: event.data.taskItemId});
+      workerPort.postMessage({action: "ERROR", code: 0, message: event.data.message, taskItemId: event.data.taskItemId, type: event.data.type});
     }
-    workerPort.postMessage(rs);
+    // workerPort.postMessage(rs);
   }).catch((err: BusinessError) => {
-    workerPort.postMessage({action: "ERROR", code: err.code, message: err.message, taskItemId: event.data.taskItemId});
+    workerPort.postMessage({action: "ERROR", code: err.code, message: err.message, taskItemId: event.data.taskItemId, type: event.data.type});
   })
 };
 
@@ -49,15 +51,44 @@ workerPort.onmessageerror = (event: MessageEvents) => {
 workerPort.onerror = (event: ErrorEvent) => {
 };
 
-async function mkRemotePath(uploadItem: UploadItemSendable, webdav: WebDav): Promise<boolean> {
-  const dirList: string[] = uploadItem.remoteUri.split('/').filter(part => part.length > 0);
+let session: rcp.Session;
+
+async function updateSerConfig(server: string, username: string, password: string) {
+  session?.close()
+  session = rcp.createSession({
+    baseAddress: server,
+    headers: { "Accept": "text/plain,application/xml" },
+    requestConfiguration: {
+      transfer: {
+        timeout: { connectMs: 3000 }
+      },
+      security: {
+        serverAuthentication: {
+          credential: {
+            username: username,
+            password: password
+          },
+          authenticationType: "basic"
+        }
+      }
+    }
+  });
+}
+
+async function mkRemotePath(uploadItem: UploadItemSendable): Promise<boolean> {
+  let remoteUri: string = uploadItem.remoteUri;
+  remoteUri = remoteUri.replace(uploadItem.serverBaseUrl, "").replace(uploadItem.backupRootPath, "");
+  const dirList: string[] = remoteUri.split('/').filter(part => part.length > 0);
   dirList.pop();
+  // 检查路径是否已经存在
   let currentPath: string = strip(uploadItem.backupRootPath, '/');
+  const rs = await colExists(currentPath + '/' + dirList.join('/'))
+  if (rs) return true;
   for (let dir of dirList) {
     // 创建目录
     currentPath += `/${dir}`;
-    console.log(`创建远程目录: ${currentPath}`);
-    const rr = await webdav.mkDir(currentPath);
+    // console.log(`创建远程目录: ${currentPath}`);
+    const rr = await mkDir(currentPath);
     if ((rr.statusCode >= 200 && rr.statusCode < 300) || rr.statusCode == 405) {
       continue
     } else {
@@ -66,8 +97,110 @@ async function mkRemotePath(uploadItem: UploadItemSendable, webdav: WebDav): Pro
       return false;
     }
   }
-  console.log(`创建远程目录: ${uploadItem.remoteUri}成功`)
+  console.log(`创建远程目录: ${currentPath}成功`)
   return true;
+}
+
+
+
+// 发送请求
+async function rcpRequest(req: rcp.Request) {
+  const requestReturn: RequestReturn = new RequestReturn();
+  try {
+    const resp = await session?.fetch(req);
+    if (resp === undefined) {
+      requestReturn.statusCode = 500;
+      requestReturn.success = false;
+      requestReturn.message = "请求失败"
+      return requestReturn;
+    }
+    // console.log(JSON.stringify(resp.headers));
+    requestReturn.statusCode = resp.statusCode;
+    requestReturn.headers = resp.headers;
+    if (resp.statusCode === 401) {
+      requestReturn.message = "用户名密码不正确"
+      requestReturn.success = false;
+      // 触发登录失败事件
+      emitter.emit(SERVER_AUTH_FAILED_EVENT);
+    }
+
+    if (resp.statusCode === 500) {
+      requestReturn.message = "服务器内部错误，请检查服务器是否正常。"
+      requestReturn.success = false;
+    }
+    if (resp.statusCode === 407) {
+      requestReturn.message = "目录不存在，请先创建目录"
+      requestReturn.success = false;
+    }
+    if (resp.statusCode === 507) {
+      requestReturn.message = "服务器存储空间不足"
+      requestReturn.success = false;
+    }
+    if (requestReturn.statusCode >= 200 && requestReturn.statusCode < 300) {
+      // 正常
+      requestReturn.statusCode = 200
+      requestReturn.body = resp.toString() ?? "";
+      requestReturn.success = true;
+    } else {
+      requestReturn.success = false;
+    }
+  } catch (err) {
+    requestReturn.statusCode = 500
+    requestReturn.success = false;
+    if (err.code === 1007900028) {
+      requestReturn.message = "服务器超时，请检查服务器地址或端口是否正确"
+    } else {
+      requestReturn.message = "连接失败，请检查本机网络或者联系作者，错误码：" + err.code + ", 错误：" + err.message
+    }
+  }
+  return requestReturn;
+}
+
+// 是否存在
+async function fileExists(path: string, size: number) {
+  console.log(`查询${path}是否存在`)
+  const req = new rcp.Request(path, "HEAD");
+  const rr = await rcpRequest(req);
+  // 不存在
+  if (!rr.success) {
+    console.log(`文件请求不成功，code: ${rr.statusCode}, msg: ${rr.message}`)
+    return 0;
+  }
+  let remoteSize: number = 0;
+  let remoteSizeArr: string | string[] | undefined = rr.headers['content-length'];
+  if (remoteSizeArr === undefined) {
+    remoteSize = 0;
+  } else if (typeof remoteSizeArr !== 'string') {
+    remoteSize = parseInt(remoteSizeArr[0]);
+  } else {
+    remoteSize = parseInt(remoteSizeArr)
+  }
+  console.log(`文件存在，比较大小是否一致, ${remoteSize}=>${size}`)
+  if (remoteSize == size) {
+    return 1
+  } else {
+    return 2;
+  }
+}
+
+// 是否文件夹存在
+async function colExists(path: string) {
+  console.log(`查询${path}是否存在`)
+  const req = new rcp.Request(path, "HEAD");
+  const rr = await rcpRequest(req);
+  return rr.success;
+}
+
+// 创建目录
+async function mkDir(path: string) {
+  const req = new rcp.Request(path, "MKCOL");
+  return await rcpRequest(req);
+}
+
+// 删除文件
+async function rcpDelete(path: string) {
+  const req = new rcp.Request(path, "DELETE");
+  return await rcpRequest(req);
 }
 
 /**
@@ -79,37 +212,22 @@ async function mkRemotePath(uploadItem: UploadItemSendable, webdav: WebDav): Pro
  */
 function doTask(uploadItem: UploadItemSendable): Promise<string> {
   return new Promise(async (resolve, reject) => {
-    // try {
-    //   fileIo.statSync(uploadItem.fileUri);
-    // } catch (e) {
-    //   // 文件不存在
-    //   if (e.code === 13900002) {
-    //     return resolve("FILE NOT EXISTS")
-    //   }
-    //   return resolve("LOCAL FILE STAT ERROR")
-    // }
     const context: common.Context = sendableContextManager.convertToContext(uploadItem.sendableContext);
     const filesDir: string = context.cacheDir;
     const fileUri = uploadItem.fileUri.replace(filesDir, 'internal://cache')
     console.log(`cacheDir: ${filesDir}, fileUri: ${uploadItem.fileUri}=>${fileUri}`);
-    const serverConfig = new ServerConfig();
-    serverConfig.server = uploadItem.serverBaseUrl;
-    serverConfig.username = uploadItem.serverUsername;
-    serverConfig.password = uploadItem.serverPassword;
-    console.log(`serverConfig赋值, ${JSON.stringify(serverConfig)}`)
+    updateSerConfig(uploadItem.serverBaseUrl, uploadItem.serverUsername, uploadItem.serverPassword);
     try {
-      let webdav = new WebDav();
-      webdav.updateSerConfig(serverConfig);
-      const mkRP = await mkRemotePath(uploadItem, webdav);
+      const mkRP = await mkRemotePath(uploadItem);
       if (!mkRP) {
         return resolve("CREATE REMOTE PATH FAIL")
       }
       // 检查文件是否已存在
-      let existsRR: number = await webdav.exists(uploadItem.remoteUri, uploadItem.fileSize);
+      let existsRR: number = await fileExists(uploadItem.remoteUri, uploadItem.fileSize);
       if (existsRR === 2) {
         console.log(`${uploadItem.remoteUri}在服务器上存在，但是大小和本地不同，删除服务端文件。`)
         // 存在，不一致，删除远程文件
-        await webdav.delete(uploadItem.remoteUri)
+        await rcpDelete(uploadItem.remoteUri)
         existsRR = 0;
       }
       if (existsRR === 1) {
@@ -117,12 +235,11 @@ function doTask(uploadItem: UploadItemSendable): Promise<string> {
         console.log(`服务器上存在${uploadItem.remoteUri}，直接返回成功`)
         return resolve("SUCCESS");
       }
-      console.log(`新建webdav`)
     } catch (e) {
-      console.error(`新建webdav报错：${e.code}, ${e.message}`)
+      console.error(`rcp请求报错：${e.code}, ${e.message}`)
     }
     // 上传任务配置项
-    const files: Array<request.File> = [{ filename: uploadItem.name, name: 'file', uri: fileUri, type: "" }]
+    const files: Array<request.File> = [{ filename: uploadItem.name, name: 'file', uri: fileUri, type: getMimeTypeFromExtension(uploadItem.fileUri) }]
     const uploadConfig: request.UploadConfig = {
       url: uploadItem.remoteUri,
       header: {'Authorization': 'Basic ' + uploadItem.auth},
@@ -131,6 +248,8 @@ function doTask(uploadItem: UploadItemSendable): Promise<string> {
     try {
       const uploadTask: request.UploadTask = await request.uploadFile(context, uploadConfig);
       uploadTask.on('complete', () => {
+        // 删除文件
+        deleteFile(uploadItem.fileUri);
         uploadTask.delete().then()
         return resolve("SUCCESS")
       });
@@ -140,8 +259,9 @@ function doTask(uploadItem: UploadItemSendable): Promise<string> {
       })
     } catch (error) {
       let err: BusinessError = error as BusinessError;
-      console.error(`Invoke uploadFile failed, code is ${err.code}, message is ${err.message}`);
+      console.error(`创建上传任务失败： ${uploadItem.fileUri} => ${uploadItem.remoteUri}, code is ${err.code}, message is ${err.message}`);
       reject(error)
     }
   })
 }
+

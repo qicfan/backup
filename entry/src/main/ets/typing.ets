@@ -50,6 +50,16 @@ export interface WorkerMessage {
   message: string
   taskItemId: number
   uploadedSize?: number
+  type: number
+}
+
+export interface CopyWorkerMessage {
+  action: "START" | "FINISH" | "UPDATE_PROGRESS" | "ERROR" | "FILE_NOT_EXISTS" | "SERVER_NOT_CONNECT"
+  code: number
+  message: string
+  taskItemId: number
+  imageSize: number
+  videoSize: number
 }
 
 export interface UploadQueueItem {

@@ -2,8 +2,9 @@ import { rcp } from "@kit.RemoteCommunicationKit";
 import { ServerConfig } from "../models/Server";
 import { xml, util } from '@kit.ArkTS';
 import { DavResource, SERVER_AUTH_FAILED_EVENT } from "../typing";
-import { emitter } from "@kit.BasicServicesKit";
-import { base64Encode } from "./tools";
+import { BusinessError, emitter, request } from "@kit.BasicServicesKit";
+import { base64Encode, deleteFile, getMimeTypeFromExtension } from "./tools";
+import { TaskItem } from "../models/TaskItem";
 
 export class RequestReturn {
   success: boolean = true;
@@ -219,95 +220,95 @@ export class WebDav {
     return base64Encode(`${this.server?.username}:${this.server?.password}`)
   }
 
-  //
-  // // 使用系统上传方法进行上传，看是否能解决大文件上传问题。
-  // uploadBySys(context: Context, name: string, remoteUri: string, filePath: string,
-  //   progressCallback: (transferredSize: number) => void): Promise<RequestReturn> {
-  //   return new Promise(async (resolve) => {
-  //     let filesDir = context.cacheDir;
-  //     filePath = filePath.replace(filesDir, 'internal://cache')
-  //     // 上传任务配置项
-  //     let files: Array<request.File> = [
-  //       {
-  //         filename: name,
-  //         name: 'file',
-  //         uri: filePath,
-  //         type: getMimeTypeFromExtension(name)
-  //       }
-  //     ]
-  //     let data: Array<request.RequestData> = [];
-  //     let uploadConfig: request.UploadConfig = {
-  //       url: remoteUri,
-  //       header: {
-  //         'Authorization': 'Basic ' + this.getBase64Auth()
-  //       },
-  //       method: 'PUT',
-  //       files: files,
-  //       data: data
-  //     }
-  //
-  //     // 将本地应用文件上传至网络服务器
-  //     try {
-  //       const uploadTask: request.UploadTask = await request.uploadFile(context, uploadConfig);
-  //       uploadTask.on('complete', (taskStates: Array<request.TaskState>) => {
-  //         for (let i = 0; i < taskStates.length; i++) {
-  //           let rr: RequestReturn = {
-  //             statusCode: 500,
-  //             success: false,
-  //             message: "",
-  //             headers: {}
-  //           };
-  //           if (taskStates[i].responseCode === 0) {
-  //             rr.success = true;
-  //             rr.statusCode = 200;
-  //           } else {
-  //             rr.success = false;
-  //             rr.statusCode = taskStates[i].responseCode;
-  //             rr.message = taskStates[i].message;
-  //           }
-  //           uploadTask.delete().then()
-  //           resolve(rr);
-  //         }
-  //       });
-  //       uploadTask.on("progress", (uploadedSize: number, totalSize: number) => {
-  //         progressCallback(uploadedSize);
-  //       })
-  //     } catch (error) {
-  //       let err: BusinessError = error as BusinessError;
-  //       console.error(`Invoke uploadFile failed, code is ${err.code}, message is ${err.message}`);
-  //       let rr: RequestReturn = {
-  //         statusCode: err.code,
-  //         success: false,
-  //         message: err.message,
-  //         headers: {}
-  //       };
-  //       resolve(rr);
-  //     }
-  //   });
-  // }
-  //
-  // // 根据文件大小来判断是否分块上传
-  // async uploadTaskItem(ctx: Context, taskItem: TaskItem, type: string = "default"): Promise<string> {
-  //   let filePath: string = taskItem.fileUri;
-  //   let remoteUri: string = taskItem.getFullRemoteUri(taskItem.remoteUri, true);
-  //   if (type !== 'default') {
-  //     filePath = taskItem.videoUri;
-  //     remoteUri = taskItem.getFullRemoteUri(taskItem.remoteVideoUri, true);
-  //   }
-  //   const rr: RequestReturn = await this.uploadBySys(ctx, taskItem.name, remoteUri, filePath, (transferredSize: number) => {
-  //       if (type === 'default') {
-  //         taskItem.updateUploadedSize(transferredSize)
-  //         taskItem.task.updateUploadedSize(transferredSize)
-  //       }
-  //   });
-  //   deletePhoto(filePath);
-  //   console.log(`${remoteUri}上传成功，删除本地临时文件：${filePath}`)
-  //   if (rr.success) {
-  //     return 'success';
-  //   } else {
-  //     return rr.message;
-  //   }
-  // }
+
+  // 使用系统上传方法进行上传，看是否能解决大文件上传问题。
+  uploadBySys(context: Context, name: string, remoteUri: string, filePath: string,
+    progressCallback: (transferredSize: number) => void): Promise<RequestReturn> {
+    return new Promise(async (resolve) => {
+      let filesDir = context.cacheDir;
+      filePath = filePath.replace(filesDir, 'internal://cache')
+      // 上传任务配置项
+      let files: Array<request.File> = [
+        {
+          filename: name,
+          name: 'file',
+          uri: filePath,
+          type: getMimeTypeFromExtension(name)
+        }
+      ]
+      let data: Array<request.RequestData> = [];
+      let uploadConfig: request.UploadConfig = {
+        url: remoteUri,
+        header: {
+          'Authorization': 'Basic ' + this.getBase64Auth()
+        },
+        method: 'PUT',
+        files: files,
+        data: data
+      }
+
+      // 将本地应用文件上传至网络服务器
+      try {
+        const uploadTask: request.UploadTask = await request.uploadFile(context, uploadConfig);
+        uploadTask.on('complete', (taskStates: Array<request.TaskState>) => {
+          for (let i = 0; i < taskStates.length; i++) {
+            let rr: RequestReturn = {
+              statusCode: 500,
+              success: false,
+              message: "",
+              headers: {}
+            };
+            if (taskStates[i].responseCode === 0) {
+              rr.success = true;
+              rr.statusCode = 200;
+            } else {
+              rr.success = false;
+              rr.statusCode = taskStates[i].responseCode;
+              rr.message = taskStates[i].message;
+            }
+            uploadTask.delete().then()
+            resolve(rr);
+          }
+        });
+        uploadTask.on("progress", (uploadedSize: number, totalSize: number) => {
+          progressCallback(uploadedSize);
+        })
+      } catch (error) {
+        let err: BusinessError = error as BusinessError;
+        console.error(`Invoke uploadFile failed, code is ${err.code}, message is ${err.message}`);
+        let rr: RequestReturn = {
+          statusCode: err.code,
+          success: false,
+          message: err.message,
+          headers: {}
+        };
+        resolve(rr);
+      }
+    });
+  }
+
+  // 根据文件大小来判断是否分块上传
+  async uploadTaskItem(ctx: Context, taskItem: TaskItem, type: string = "default"): Promise<string> {
+    let filePath: string = taskItem.fileUri;
+    let remoteUri: string = taskItem.getFullRemoteUri(taskItem.remoteUri, true);
+    if (type !== 'default') {
+      filePath = taskItem.videoUri;
+      remoteUri = taskItem.getFullRemoteUri(taskItem.remoteVideoUri, true);
+    }
+    const rr: RequestReturn = await this.uploadBySys(ctx, taskItem.name, remoteUri, filePath, (transferredSize: number) => {
+        if (type === 'default') {
+          taskItem.updateUploadedSize(transferredSize)
+          taskItem.task.updateUploadedSize(transferredSize)
+        }
+    });
+    deleteFile(filePath);
+    console.log(`${remoteUri}上传成功，删除本地临时文件：${filePath}`)
+    if (rr.success) {
+      return 'success';
+    } else {
+      return rr.message;
+    }
+  }
 
 
   // 解析dav xml

@@ -21,7 +21,6 @@ import { BusinessError, emitter } from "@kit.BasicServicesKit";
 import { Task } from "../models/Task";
 import { backgroundTaskManager } from "@kit.BackgroundTasksKit";
 import { notificationManager } from "@kit.NotificationKit";
-import { TaskItem } from "../models/TaskItem";
 import { checkPermissions } from "../utils/permission";
 import { getBatteryLevel, getCurrentNetType } from "../utils/tools";
 import { connection } from "@kit.NetworkKit";
@@ -30,11 +29,6 @@ import { TaskFiles } from "../components/TaskFiles";
 import { TipDialog } from "../dialogs/TipDialog";
 import { Dialog } from "../utils/dialog";
 import { Agreement } from "../components/Agreement";
-import { relationalStore } from "@kit.ArkData";
-import { UploadItemSendable } from "../models/UploadItemSendable";
-import { Queue } from "@kit.ArkTS";
-import { WorkerPool } from "../utils/workerPool";
-import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { TaskUpload } from "../utils/taskUpload";
 
 @Builder
@@ -127,6 +121,9 @@ struct Index {
 
   onPageHide(): void {
     console.log('app切换到后台或者离开首页');
+    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask") && this.global.processId > 0) {
+      this.startBackground();
+    }
   }
 
   // app启动时进行各项功能初始化和检测
@@ -329,7 +326,7 @@ struct Index {
     }
     let waitTask: Task | undefined;
     if (!taskId) {
-      waitTask = await Task.getWaitList();
+      waitTask = await Task.oneWaitTask();
     } else {
       waitTask = new Task();
       waitTask.id = taskId;
@@ -342,11 +339,11 @@ struct Index {
     }
     console.log("开始执行任务：" + waitTask.id)
     this.global.processId = waitTask.id;
-    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")) {
-      this.startBackground(waitTask);
-    } else {
-      (TaskUpload.getInstance()).start(this.ctxUIAbility, waitTask);
-    }
+    emitter.on(Global.BACKUP_TASK_FINISH, (data) => {
+      this.stopTaskEvent(data.data?.id, false);
+      emitter.off(Global.BACKUP_TASK_FINISH);
+    });
+    (TaskUpload.getInstance()).start(this.ctxUIAbility, waitTask);
     return true;
   }
 
@@ -370,8 +367,9 @@ struct Index {
   async stopTask(task: Task, reason: string) {
     this.notifyId = 0;
     this.jobId = 0;
+    this.global.processId = 0;
     await task.finish(reason);
-    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")) {
+    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask") && this.jobId > 0) {
       // 取消长时任务
       backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
     }
@@ -380,8 +378,9 @@ struct Index {
   }
 
   // 启动长时任务
-  startBackground(task: Task) {
-    this.webdav.updateSerConfig(this.server)
+  async startBackground() {
+    const task = await Task.getById(this.global.processId);
+    if (!task) return;
     const wantAgentInfo: wantAgent.WantAgentInfo = {
       wants: [{ bundleName: this.ctxUIAbility.abilityInfo.bundleName, abilityName: this.ctxUIAbility.abilityInfo.name }],
       actionType: wantAgent.OperationType.START_ABILITY, requestCode: 0,
@@ -414,26 +413,12 @@ struct Index {
               clearInterval(updateProgressHandleId);
               return;
             }
-            const process: number = parseFloat((task.uploadedSize / task.size * 100).toFixed(2));
-            let a = process;
-            if (preC === 0) {
-              preC = process;
-            }
-            if (preC === process) {
-              c += 0.01;
-              a += c;
-            } else {
-              c = 0;
-              preC = 0;
-            }
-
             // 每秒更新一次任务进度
-            this.updateNotifyProcess(task, a);
+            this.updateNotifyProcess(task);
             // 触发UI更新
             emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
             return;
           }, 1000);
-          (TaskUpload.getInstance()).start(this.ctxUIAbility, task);
         })
         .catch((error: BusinessError) => {
           console.error(`启动长时任务失败. code is ${error.code} message is ${error.message}`);
@@ -444,9 +429,10 @@ struct Index {
   }
 
   // 应用更新通知栏进度
-  updateNotifyProcess(task: Task, process: number) {
+  updateNotifyProcess(task: Task) {
     // 应用定义下载类通知模版
     const cur = task.suc + task.fail
+    const process: number = parseFloat(((cur / task.total) * 100).toFixed(2));
     let downLoadTemplate: notificationManager.NotificationTemplate = {
       name: 'downloadTemplate', // 当前只支持downloadTemplate，保持不变
       data: {
@@ -476,106 +462,6 @@ struct Index {
     }).catch((err: BusinessError) => {
       console.error(`更新长时任务进度失败: code: ${err.code}. msg: ${err.message}`);
     });
-  }
-
-  async backgroundTaskStart(task: Task) {
-    console.info("开始执行长时任务，上传照片");
-    // 触发UI更新，显示任务进度
-    emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
-    // 对于上传下载类的长时任务，应用可以使用res中返回的notificationId来更新通知，比如发送带进度条的模板通知。
-    // 将任务标记为开始执行
-    await task.start();
-    emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
-    console.log(`任务 ${task.id} 开始执行...`)
-    let page = 1;
-    let pageSize = 100;
-    let cancelReason: string = "";
-    const auth = this.webdav.getBase64Auth();
-    const uploadItemQueue: Queue<UploadItemSendable> = new Queue<UploadItemSendable>();
-    const copyImageQueue: Queue<TaskItem> = new Queue<TaskItem>();
-    const fileWorkerPool: WorkerPool = new WorkerPool("entry/ets/workers/CopyImageWorker.ets")
-    const uploadWorkerPool: WorkerPool = new WorkerPool("entry/ets/workers/UploadWorker.ets")
-    while (true) {
-      await task.fetch()
-      const rs: relationalStore.ResultSet | null = await task.getWaitItems(page, pageSize)
-      let count: number = 0;
-      if (rs !== null) {
-        count = rs.rowCount;
-      }
-      console.log(`第${page}页查询到${count}条数据`)
-      if (count === 0) {
-        console.log(`${page}页没有数据，跳出循环`);
-        break;
-      }
-      while (rs?.goToNextRow()) {
-        const taskItem = TaskItem.getInstance(rs);
-        taskItem.task = task;
-        if (taskItem.subType !== photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
-          copyImageQueue.add(taskItem);
-        } else {
-          // 生成sendable对象并加入队列
-          uploadItemQueue.add(new UploadItemSendable(this.ctxUIAbility, taskItem, auth));
-          uploadItemQueue.add(new UploadItemSendable(this.ctxUIAbility, taskItem, auth, 2));
-        }
-      }
-      rs?.close();
-      // 开始执行任务
-      emitter.on(Global.BACKUP_COPY_WORKER_IDLE, () => {
-        const taskItem: TaskItem = copyImageQueue.pop();
-        if (!taskItem) return;
-        const isSuc: boolean = fileWorkerPool.executeCopyImage(taskItem);
-        if (!isSuc) {
-          // 进入执行队列失败，再放回队列
-          copyImageQueue.add(taskItem);
-        }
-      })
-      while(true) {
-        const taskItem: TaskItem = copyImageQueue.pop();
-        if (!taskItem) {
-          break;
-        }
-        const isSuc: boolean = fileWorkerPool.executeCopyImage(taskItem);
-        if (isSuc) continue;
-        // 执行失败，等待空线程
-        break;
-      }
-      emitter.on(Global.BACKUP_UPLOAD_WORKER_IDLE, () => {
-        const uploadItem: UploadItemSendable = uploadItemQueue.pop();
-        if (!uploadItem) return;
-        TaskItem.getById(uploadItem.taskItemId).then((taskItem) => {
-          if (!taskItem) return;
-          const isSuc: boolean = uploadWorkerPool.execute(uploadItem, task, taskItem);
-          if (!isSuc) {
-            uploadItemQueue.add(uploadItem);
-          }
-        })
-      })
-      while (true) {
-        const uploadItem: UploadItemSendable = uploadItemQueue.pop();
-        if (!uploadItem) break;
-        const taskItem = await TaskItem.getById(uploadItem.taskItemId);
-        if (!taskItem) continue;
-        const isSuc: boolean = uploadWorkerPool.execute(uploadItem, task, taskItem)
-        if (isSuc) continue;
-        // 执行失败，等待空线程
-        break;
-      }
-      if (Global.PAUSE) {
-        console.log(`收到暂停信号，跳出文件上传循环`)
-        break;
-      }
-      if (count === pageSize) {
-        page++;
-      }
-    }
-    console.log(`长时任务执行完毕，取消原因: ${cancelReason}，是否暂停:${Global.PAUSE}`)
-    // 完成任务
-    await this.stopTask(task, cancelReason);
-    Global.PAUSE = false;
-    if (!Global.PAUSE && this.config.auto == AUTOBackup.YES) {
-      // 触发下一次执行
-      emitter.emit(Global.START_WAIT_TASK_EVENT)
-    }
   }
 
   @Builder
