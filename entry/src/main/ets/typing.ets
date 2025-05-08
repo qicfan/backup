@@ -1,3 +1,6 @@
+import { TaskItem } from "./models/TaskItem";
+import { UploadItemSendable } from "./models/UploadItemSendable";
+
 export enum LoginStatus { INIT = "init", NO_SERVER = "no_server", NO_LOGIN = "no_login", LOGIN = "login" }
 export enum TaskDoing {NO = "no", YES = "yes"}
 export enum ConfigGlobalStatus {NO = 0, YES = 1}
@@ -39,4 +42,27 @@ export interface UploadEvent {
   password: string
   backupRootPath: string
   cacheFileDir: string
+}
+
+export interface WorkerMessage {
+  action: "START" | "FINISH" | "UPDATE_PROGRESS" | "ERROR" | "FILE_NOT_EXISTS" | "SERVER_NOT_CONNECT"
+  code: number
+  message: string
+  taskItemId: number
+  uploadedSize?: number
+  type: number
+}
+
+export interface CopyWorkerMessage {
+  action: "START" | "FINISH" | "UPDATE_PROGRESS" | "ERROR" | "FILE_NOT_EXISTS" | "SERVER_NOT_CONNECT"
+  code: number
+  message: string
+  taskItemId: number
+  imageSize: number
+  videoSize: number
+}
+
+export interface UploadQueueItem {
+  uploadItem: UploadItemSendable,
+  taskItem: TaskItem
 }

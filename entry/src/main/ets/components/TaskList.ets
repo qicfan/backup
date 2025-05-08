@@ -9,9 +9,8 @@ export struct TaskList {
   @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack()
 
   @Local list: Task[] = [];
-
-  private page: number = 1;
-  private pageSize: number = 20;
+  @Local c: number = 0;
+  @Local t: number = 0;
 
   aboutToAppear(): void {
     // 查询任务列表
@@ -24,21 +23,27 @@ export struct TaskList {
     });
   }
 
-  async getList(direction: string) {
-    if (direction == 'pull') {
-      this.page = 1;
-    } else {
-      this.page ++;
-    }
-    try {
-      const list = await Task.getList(this.page, this.pageSize);
-      // console.log(`tasklist组件查询到 ${list.length}条数据`)
-      if (this.page === 1) {
-        this.list = list
-      } else {
-        this.list = this.list.concat(list)
-      }
+  aboutToDisappear(): void {
+    emitter.off(Global.COLLECT_PHOTO_FINISH_EVENT);
+  }
 
+  // 查询所有未完成的 + 一个已完成的 + 所有其他已完成的统计
+  async getList(direction: string) {
+    try {
+      let lastIds: Array<number> = [];
+      const task = await Task.lastFinishTask();
+      const waitList = await Task.getWaitList();
+      if (task === null) {
+        this.list = waitList;
+      } else {
+        this.list = [...waitList, task]
+      }
+      this.list.forEach((item) => lastIds.push(item.id));
+      lastIds = Array.from(new Set(lastIds)); // 去除重复项
+      console.log(`lastId: ${JSON.stringify(lastIds)}`)
+      const rs: Array<number> = await Task.finishStat(lastIds);
+      this.c = rs[0];
+      this.t = rs[1];
     } catch (error) {
       let err = error as BusinessError
       console.log(`查询照片失败，code=${err.code}, msg=${err.message}`)
@@ -62,14 +67,26 @@ export struct TaskList {
       .height('100%')
       .backgroundColor($r('app.color.ibest_background'))
     } else {
-      List() {
-        ForEach(this.list, (item: Task) => {
-          TaskItem({task: item})
-        }, (item: Task) => item.id + '')
+      Column() {
+        List() {
+          ForEach(this.list, (item: Task) => {
+            TaskItem({task: item})
+          }, (item: Task) => item.id + '')
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .backgroundColor($r('app.color.ibest_background'))
+        if (this.c > 0 && this.t > 0) {
+          Column() {
+            Text(`除上面列表外，已备份${this.t}个照片或视频`)
+          }
+          .justifyContent(FlexAlign.Center)
+          .width('100%')
+          .height(40)
+        }
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.ibest_background'))
     }
   }
 }

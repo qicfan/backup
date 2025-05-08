@@ -50,17 +50,17 @@ export class Photos {
         item.size = ps.get('size') as number;
         item.status = TaskItemStatus.WAIT;
         item.makeUri(ctx)
-        // 处理动态图片
-        if (item.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
-          // 保存动态图片的视频
-          const videoSize = await Photos.saveMovingPhotoVideoByAsset(ctx, ps, item.videoUri);
-          if (videoSize === -1) {
-            continue;
-          }
-          item.videoSize = videoSize;
-        } else {
-          item.videoSize = 0;
-        }
+        // // 处理动态图片
+        // if (item.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
+        //   // 保存动态图片的视频
+        //   const videoSize = await Photos.saveMovingPhotoVideoByAsset(ctx, ps, item.videoUri);
+        //   if (videoSize === -1) {
+        //     continue;
+        //   }
+        //   item.videoSize = videoSize;
+        // } else {
+        //   item.videoSize = 0;
+        // }
         items.push(item)
       }
     } catch (e) {

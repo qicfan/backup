@@ -13,8 +13,9 @@ import { Global } from "../models/Global";
 @ComponentV2
 export struct TaskFileItem {
   @Param fileItem: TaskItem = new TaskItem();
-  @Local config: Config = AppStorageV2.connect(Config, "config", () => new Config())!;
-  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => new WebDav())!;
+  @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
+  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
+  @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local thumbnail: PixelMap | undefined = undefined;
   private asset: photoAccessHelper.PhotoAsset | undefined = undefined;
   private bigPhotoPm: PixelMap | undefined = undefined;
@@ -120,7 +121,6 @@ export struct TaskFileItem {
                 this.reUpload();
               })
           }
-
         }
         .width(24)
         .alignItems(HorizontalAlign.Center)

@@ -20,8 +20,17 @@ export class Config {
   createdAt: number = 0;
   private db: DB | null = null;
 
+  private static _instance: Config | null = null;
+
+  static getInstance() {
+    if (Config._instance === null) {
+      Config._instance = new Config();
+    }
+    return Config._instance;
+  }
+
   constructor() {
-    this.db = DB.dbInstance
+    this.db = DB.getInstance()
   }
 
   async init() {

@@ -1,5 +1,18 @@
 {
   "apiType": "stageMode",
+  "buildOption": {
+    "nativeLib": {
+      "debugSymbol": {
+        "strip": false
+      }
+    },
+    "sourceOption": {
+      "workers": [
+        './src/main/ets/workers/UploadWorker.ets',
+        './src/main/ets/workers/CopyImageWorker.ets'
+      ]
+    }
+  },
   "buildOptionSet": [
     {
       "name": "release",

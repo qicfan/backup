@@ -9,9 +9,9 @@ import { LoginStatus } from "../typing";
 @ComponentV2
 export struct Login {
   @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack()
-  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => new ServerConfig())!;
-  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => new WebDav())!;
-  @Local global: Global = AppStorageV2.connect(Global, "global", () => new Global())!;
+  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
+  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
+  @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local addBtnLoading: boolean = false;
   @Local serverPath: string = ""
   @Local username: string = ""

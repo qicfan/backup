@@ -3,12 +3,13 @@ import { intl } from '@kit.LocalizationKit';
 import { relationalStore } from "@kit.ArkData";
 import { DB } from "./DB";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
-import { copyPhoto, splitFileExt, strip } from "../utils/tools";
-import { RequestReturn, WebDav } from "../utils/webdav";
+import { copyImg2Sandbox, splitFileExt, strip } from "../utils/tools";
+import { WebDav } from "../utils/webdav";
 import { Config } from "./Config";
 import { Task } from "./Task";
-import { Photos } from "../utils/photos";
 import { common } from "@kit.AbilityKit";
+import { Global } from "./Global";
+import { BusinessError } from "@kit.BasicServicesKit";
 
 @ObservedV2
 export class TaskItem {
@@ -33,8 +34,8 @@ export class TaskItem {
   uploadedAt: number = 0;
   static TABLE_NAME = 'task_items'
   public task: Task = new Task();
-  public webdav: WebDav = new WebDav()
-  public config: Config = new Config()
+  public webdav: WebDav = WebDav.getInstance()
+  public config: Config = Config.getInstance()
 
   updateWebDav(webdav: WebDav, config: Config) {
     this.webdav = webdav;
@@ -94,6 +95,66 @@ export class TaskItem {
     return taskItem;
   }
 
+  static async getById(id: number) {
+    let item: TaskItem | undefined = undefined;
+    let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
+    predicates.equalTo("id", id)
+    try {
+      const rs = await DB.getInstance().store?.query(predicates);
+      if (rs === undefined || rs.rowCount <= 0) {
+        return item;
+      }
+      while (rs.goToNextRow()) {
+        item = TaskItem.getInstance(rs);
+      }
+      rs.close();
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+    } finally {
+      return item;
+    }
+  }
+
+  // 从数据库中查询最新的值
+  async fetch() {
+    let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
+    predicates.equalTo("id", this.id)
+    try {
+      const rs = await DB.getInstance().store?.query(predicates);
+      if (!rs || rs.rowCount <= 0) {
+        return false
+      }
+      while (rs.goToNextRow()) {
+        this.name = rs.getString(rs.getColumnIndex('name'))
+        this.taskId = rs.getLong(rs.getColumnIndex('task_id'))
+        this.id = rs.getLong(rs.getColumnIndex('id'))
+        this.uri = rs.getString(rs.getColumnIndex('uri'))
+        this.fileUri = rs.getString(rs.getColumnIndex('file_uri'))
+        this.remoteUri = rs.getString(rs.getColumnIndex('remote_uri'))
+        this.videoUri = rs.getString(rs.getColumnIndex('video_uri'))
+        this.remoteVideoUri = rs.getString(rs.getColumnIndex('remote_video_uri'))
+        this.failedReason = rs.getString(rs.getColumnIndex('failed_reason'))
+        this.size = rs.getLong(rs.getColumnIndex('size'))
+        this.videoSize = rs.getLong(rs.getColumnIndex('video_size'))
+        this.uploadedSize = rs.getLong(rs.getColumnIndex('uploaded_size'))
+        this.photoType = rs.getLong(rs.getColumnIndex('photo_type'))
+        this.subType = rs.getLong(rs.getColumnIndex('sub_type'))
+        this.status = rs.getLong(rs.getColumnIndex('status'))
+        this.createdAt = rs.getLong(rs.getColumnIndex('created_at'))
+        this.uploadedAt = rs.getLong(rs.getColumnIndex('uploaded_at'))
+        this.dateAdded = rs.getLong(rs.getColumnIndex('date_added'))
+        this.dateModified = rs.getLong(rs.getColumnIndex('date_modified'))
+        return true;
+      }
+    } catch (e) {
+      let err = e as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+      return false;
+    }
+    return false;
+  }
+
   async start() {
     this.status = TaskItemStatus.UPLOADING;
     this.updateStatus();
@@ -125,9 +186,27 @@ export class TaskItem {
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
     predicates.equalTo("id", this.id)
     try {
-      await DB.dbInstance?.store?.update(updateBucket, predicates);
+      await DB.getInstance().store?.update(updateBucket, predicates);
     } catch (err) {
       console.error(`task Insert failed, code is ${err.code},message is ${err.message}`);
+    }
+  }
+
+  async updateSize(size: number, videoSize: number) {
+    this.size = size;
+    this.videoSize = videoSize;
+    this.uploadedAt = Math.floor(Date.now() / 1000);
+    const updateBucket: relationalStore.ValuesBucket = {
+      "size": this.size,
+      "video_size": this.videoSize,
+      "uploaded_at": this.uploadedAt
+    };
+    let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
+    predicates.equalTo("id", this.id)
+    try {
+      await DB.getInstance().store?.update(updateBucket, predicates);
+    } catch (err) {
+      console.error(`task item update size failed, code is ${err.code},message is ${err.message}`);
     }
   }
 
@@ -139,9 +218,9 @@ export class TaskItem {
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
     predicates.equalTo("id", this.id)
     try {
-      await DB.dbInstance?.store?.update(updateBucket, predicates);
+      await DB.getInstance().store?.update(updateBucket, predicates);
     } catch (err) {
-      console.error(`task Insert failed, code is ${err.code},message is ${err.message}`);
+      console.error(`task item update uploadedSize failed, code is ${err.code},message is ${err.message}`);
     }
   }
 
@@ -167,7 +246,7 @@ export class TaskItem {
       "date_modified": this.dateModified,
     };
     try {
-      await DB.dbInstance?.store?.insert(TaskItem.TABLE_NAME, insertBucket,
+      await DB.getInstance().store?.insert(TaskItem.TABLE_NAME, insertBucket,
         relationalStore.ConflictResolution.ON_CONFLICT_IGNORE);
       // console.info(`task item insert row: ${rowId}`);
       return true;
@@ -198,6 +277,9 @@ export class TaskItem {
   }
 
   getFullRemoteUri(remoteUri: string, hasBaseUri: boolean = false) {
+    if (!this.webdav.server) {
+      return "";
+    }
     let url: string = "";
     if (hasBaseUri) {
       url = strip(this.webdav.server.server, '/')
@@ -234,7 +316,8 @@ export class TaskItem {
       // 不存在,先复制文件
       try {
         console.log(`先复制要上传的文件${this.uri} => ${this.fileUri}`)
-        await copyPhoto(this.uri, this.size, this.fileUri);
+        // await copyPhoto(this.uri, this.size, this.fileUri);
+        await copyImg2Sandbox(this.uri, this.fileUri, this.size);
       } catch (e) {
         console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
         this.failed(e.message)
@@ -242,6 +325,7 @@ export class TaskItem {
       }
       // 上传图片文件
       console.log(`开始上传文件${remoteUri}，大小:${this.size}`)
+      if (Global.PAUSE) return false;
       const rs = await this.webdav.uploadTaskItem(ctx, this);
       if (rs != "success") {
         console.log(`${remoteUri}上传失败`)

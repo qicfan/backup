@@ -31,6 +31,15 @@ export class ServerConfig {
   username: string = ""
   password: string = ""
 
+  private static _instance: ServerConfig | null = null;
+
+  static getInstance() {
+    if (ServerConfig._instance === null) {
+      ServerConfig._instance = new ServerConfig();
+    }
+    return ServerConfig._instance;
+  }
+
   constructor() {
   }
 

@@ -25,9 +25,9 @@ function buildDirSelect(params: Params) {
 @ComponentV2
 export struct Settings {
   @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack()
-  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => new ServerConfig())!;
-  @Local global: Global = AppStorageV2.connect(Global, "global", () => new Global())!;
-  @Local config: Config = AppStorageV2.connect(Config, "config", () => new Config())!;
+  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
+  @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
+  @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local backupTypeValue: string[] = [];
   @Local showBackupTypePopup: boolean = false
   @Local backupTypeOptions: IBestPickerOption[] = [
