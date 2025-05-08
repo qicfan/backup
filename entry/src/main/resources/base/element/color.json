@@ -467,6 +467,10 @@
     {
       "name": "ibest_table_footer_background",
       "value": "$color:ibest_gray_2"
+    },
+    {
+      "name": "item_title_font",
+      "value": "#E6000000"
     }
   ]
 }

@@ -11,6 +11,10 @@
     {
       "name": "inner_padding",
       "value": "8vp"
+    },
+    {
+      "name": "font_size",
+      "value": "14fp"
     }
   ]
 }

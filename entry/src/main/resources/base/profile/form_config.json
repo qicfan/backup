@@ -1,0 +1,25 @@
+{
+  "forms": [
+    {
+      "name": "backupWidget",
+      "displayName": "$string:backupWidget_display_name",
+      "description": "$string:backupWidget_desc",
+      "src": "./ets/backupwidget/pages/BackupWidgetCard.ets",
+      "uiSyntax": "arkts",
+      "window": {
+        "designWidth": 720,
+        "autoDesignWidth": true
+      },
+      "colorMode": "auto",
+      "isDynamic": true,
+      "isDefault": true,
+      "updateEnabled": false,
+      "scheduledUpdateTime": "10:30",
+      "updateDuration": 1,
+      "defaultDimension": "1*2",
+      "supportDimensions": [
+        "1*2"
+      ]
+    }
+  ]
+}

@@ -23,7 +23,7 @@
         "startWindowIcon": "$media:icon",
         "startWindowBackground": "$color:start_window_background",
         "exported": true,
-//        "orientation": "auto_rotation",
+        //        "orientation": "auto_rotation",
         "backgroundModes": [
           "dataTransfer"
         ],
@@ -49,6 +49,19 @@
           {
             "name": "ohos.extension.backup",
             "resource": "$profile:backup_config"
+          }
+        ]
+      },
+      {
+        "name": "EntryBackupFormAbility",
+        "srcEntry": "./ets/entrybackupformability/EntryBackupFormAbility.ets",
+        "label": "$string:EntryBackupFormAbility_label",
+        "description": "$string:EntryBackupFormAbility_desc",
+        "type": "form",
+        "metadata": [
+          {
+            "name": "ohos.extension.form",
+            "resource": "$profile:form_config"
           }
         ]
       }

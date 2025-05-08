@@ -31,6 +31,22 @@
     {
       "name": "NETWORK_reason",
       "value": "查询是否处于WIFI环境下"
+    },
+    {
+      "name": "EntryBackupFormAbility_desc",
+      "value": "form_description"
+    },
+    {
+      "name": "EntryBackupFormAbility_label",
+      "value": "form_label"
+    },
+    {
+      "name": "backupWidget_desc",
+      "value": "backup button "
+    },
+    {
+      "name": "backupWidget_display_name",
+      "value": "backupWidget"
     }
   ]
 }
