@@ -51,19 +51,6 @@
             "resource": "$profile:backup_config"
           }
         ]
-      },
-      {
-        "name": "EntryBackupFormAbility",
-        "srcEntry": "./ets/entrybackupformability/EntryBackupFormAbility.ets",
-        "label": "$string:EntryBackupFormAbility_label",
-        "description": "$string:EntryBackupFormAbility_desc",
-        "type": "form",
-        "metadata": [
-          {
-            "name": "ohos.extension.form",
-            "resource": "$profile:form_config"
-          }
-        ]
       }
     ],
     "requestPermissions": [

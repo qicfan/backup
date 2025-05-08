@@ -15,6 +15,7 @@ export struct TaskItem {
   @Local doing: boolean = false;
 
   private siHandle: number = 0;
+  private stopiHandle: number = 0;
 
   @Computed
   get process() {
@@ -60,36 +61,38 @@ export struct TaskItem {
       // 已经启动了
       return ;
     }
+    console.log("发送开始任务通知：" + this.task.id)
+    emitter.emit(Global.START_WAIT_TASK_EVENT, { data: { id: this.task.id } });
     this.siHandle = setInterval(() => {
       // 每隔1秒检查进度
       this.task.fetch().then(() => {
-        console.log(`检查任务${this.task.id}进度，状态: ${this.task.status},成功：${this.task.success}, 失败:${this.task.failed}, 已上传字节数：${this.task.realUploadedSize}，总字节数：${this.task.size}`)
-        if (this.task.status === TaskStatus.FINISH || this.task.status === TaskStatus.WAIT) {
+        console.log(`start: 检查任务${this.task.id}进度，状态: ${this.task.status},成功：${this.task.success}, 失败:${this.task.failed}, 已上传字节数：${this.task.realUploadedSize}，总字节数：${this.task.size}`)
+        if (this.task.status == TaskStatus.FINISH || this.task.status == TaskStatus.WAIT) {
           clearInterval(this.siHandle);
           this.siHandle = 0;
           return ;
         }
       })
-    }, 1000)
-    console.log("发送开始任务通知：" + this.task.id)
-    emitter.emit(Global.START_WAIT_TASK_EVENT, { data: { id: this.task.id } });
+    }, 300);
   }
 
   stopTask() {
     console.log("发送暂停任务通知：" + this.task.id)
     this.doing = false;
     emitter.emit(Global.STOP_TASK_EVENT, { data: { id: this.task.id } });
-    this.siHandle = setInterval(() => {
+    this.stopiHandle = setInterval(() => {
       // 每隔1秒检查进度
       this.task.fetch().then(() => {
-        console.log(`检查任务${this.task.id}进度，状态: ${this.task.status},成功：${this.task.success}, 失败:${this.task.failed}, 已上传字节数：${this.task.realUploadedSize}，总字节数：${this.task.size}`)
+        console.log(`stop: 检查任务${this.task.id}进度，状态: ${this.task.status},成功：${this.task.success}, 失败:${this.task.failed}, 已上传字节数：${this.task.realUploadedSize}，总字节数：${this.task.size}`)
         if (this.task.status === TaskStatus.FINISH || this.task.status === TaskStatus.WAIT) {
+          clearInterval(this.stopiHandle);
+          this.stopiHandle = 0;
           clearInterval(this.siHandle);
           this.siHandle = 0;
           return ;
         }
       })
-    }, 1000)
+    }, 300)
   }
 
   build() {
@@ -117,7 +120,7 @@ export struct TaskItem {
           }
           .width('100%')
 
-          Text(`总计${this.task.total}张，成功${this.task.success}，失败${this.task.failed}，上传中${this.task.uploadCount}`)
+          Text(`总计${this.task.total}张，成功${this.task.success}，失败${this.task.failed}`)
             .width('100%')
             .textAlign(TextAlign.Start)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
@@ -165,7 +168,7 @@ export struct TaskItem {
         .justifyContent(FlexAlign.Center)
         .margin({ left: $r('app.float.inner_padding') })
         .onClick(() => {
-          if (this.task.status == TaskStatus.WAIT || (this.task.status == TaskStatus.FINISH && this.task.failed > 0)) {
+          if (this.task.status == TaskStatus.WAIT || (this.task.status == TaskStatus.FINISH && this.task.fail > 0)) {
             this.startTask();
           }
           if (this.task.status == TaskStatus.PROCESS) {

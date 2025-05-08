@@ -87,6 +87,10 @@ export class WebDav {
         // 触发登录失败事件
         emitter.emit(SERVER_AUTH_FAILED_EVENT);
       }
+      if (resp.statusCode === 409) {
+        requestReturn.message = "权限不足"
+        requestReturn.success = false;
+      }
 
       if (resp.statusCode === 500) {
         requestReturn.message = "服务器内部错误，请检查服务器是否正常。"
@@ -181,6 +185,9 @@ export class WebDav {
 
   // 创建目录
   async mkDir(path: string) {
+    if (!path.endsWith('/')) {
+      path = path + '/';
+    }
     const req = new rcp.Request(path, "MKCOL");
     return await this.request(req);
   }

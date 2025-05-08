@@ -19,7 +19,7 @@ export class Task {
   @Trace uploadedSize: number = 0;
   @Trace success: number = 0;
   @Trace failed: number = 0;
-  @Trace status: TaskStatus = TaskStatus.WAIT
+  @Trace status: TaskStatus = TaskStatus.WAIT;
   @Trace cancelReason: string = "";
   @Trace uploadCount: number = 0;
   createdAt: number = 0;

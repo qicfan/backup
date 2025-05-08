@@ -22,13 +22,19 @@ export struct FolderSelectDialog {
   aboutToAppear() {
     // console.log("folder select dialog open")
     let path = this.rootPath;
+    console.log(path);
     path = path.replace('/' + this.deviceName + '/', '')
+    console.log(path);
     // 如果为空则设置为/
     if (path === "") {
       this.path = ['/']
     } else {
       this.path = path.split('/')
     }
+    if (this.path.length >=2 && this.path[0] == "" && this.path[1] == "") {
+      this.path.shift();
+    }
+    console.log(JSON.stringify(this.path));
     this.webdav.getDirs(this.path.join('/')).then((rr) => {
       this.dirList = rr.data ? rr.data : [];
       this.init = false;
@@ -40,10 +46,13 @@ export struct FolderSelectDialog {
   changeDir(href: string) {
     IBestToast.showLoading()
     let path = href.split('/');
+    console.log(JSON.stringify(path));
     if (path[path.length - 1] === '') {
       path.pop()
     }
+    console.log(JSON.stringify(path));
     this.path = path;
+    console.log(JSON.stringify(this.path));
     this.webdav.getDirs(href).then((rr) => {
       // console.log(JSON.stringify(rr))
       this.dirList = rr.data ? rr.data : [];
@@ -170,8 +179,13 @@ export struct FolderSelectDialog {
 
 
       Column() {
-        Text(`已选路径：${this.path.join('/')}/${this.deviceName}`)
-          .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+        if (this.path.join('/') == "/") {
+          Text(`已选路径：${this.path.join('/')}${this.deviceName}`)
+            .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+        } else {
+          Text(`已选路径：${this.path.join('/')}/${this.deviceName}`)
+            .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+        }
       }
       .width('100%')
       .height(30)
@@ -196,15 +210,24 @@ export struct FolderSelectDialog {
           }
           const valueLength = this.newDirName.trim().length
           this.formInputError = !valueLength
-          let path = this.path.join('/') + '/' + this.newDirName
+          let path = this.path.join('/') + '/' + this.newDirName + '/'
           try {
-            this.webdav.mkDir(path).then(() => {
-              IBestNotify.show({
-                message: "已切换到新建的目录",
-                duration: 3000,
-                type: 'success'
-              })
-              this.changeDir(path);
+            this.webdav.mkDir(path).then((rs) => {
+              console.log(JSON.stringify(rs))
+              if (rs.success) {
+                IBestNotify.show({
+                  message: "已切换到新建的目录",
+                  duration: 3000,
+                  type: 'success'
+                })
+                this.changeDir(path);
+              } else {
+                IBestNotify.show({
+                  message: rs.message,
+                  duration: 3000,
+                  type: 'warning'
+                })
+              }
             })
           } catch (error) {
             const err = error as BusinessError;
