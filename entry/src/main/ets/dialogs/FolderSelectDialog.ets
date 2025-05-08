@@ -31,6 +31,9 @@ export struct FolderSelectDialog {
     } else {
       this.path = path.split('/')
     }
+    if (this.path.length >=2 && this.path[0] == "" && this.path[1] == "") {
+      this.path.shift();
+    }
     console.log(JSON.stringify(this.path));
     this.webdav.getDirs(this.path.join('/')).then((rr) => {
       this.dirList = rr.data ? rr.data : [];
@@ -176,8 +179,13 @@ export struct FolderSelectDialog {
 
 
       Column() {
-        Text(`已选路径：${this.path.join('/')}/${this.deviceName}`)
-          .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+        if (this.path.join('/') == "/") {
+          Text(`已选路径：${this.path.join('/')}${this.deviceName}`)
+            .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+        } else {
+          Text(`已选路径：${this.path.join('/')}/${this.deviceName}`)
+            .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+        }
       }
       .width('100%')
       .height(30)
