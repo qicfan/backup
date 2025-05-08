@@ -55,6 +55,7 @@ export class UploadWorkerItem {
             return ;
           }
           if (data.action === "ERROR") {
+            console.error(JSON.stringify(data));
             // 上传发生错误
             await taskItem.failed(data.message);
             await task.canFinish()

@@ -35,7 +35,8 @@ export struct Login {
     this.server.username = this.username;
     this.server.password = this.password;
     this.webdav.updateSerConfig(this.server);
-    const rs = await this.webdav.valid()
+    const rs = await this.webdav.valid();
+    console.log(JSON.stringify(rs));
     if (rs.statusCode !== 200) {
       IBestNotify.show({
         message: rs.message,

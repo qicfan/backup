@@ -185,6 +185,9 @@ async function fileExists(path: string, size: number) {
 
 // 是否文件夹存在
 async function colExists(path: string) {
+  if (!path.endsWith('/')) {
+    path = path + '/';
+  }
   console.log(`查询${path}是否存在`)
   const req = new rcp.Request(path, "HEAD");
   const rr = await rcpRequest(req);
@@ -193,6 +196,9 @@ async function colExists(path: string) {
 
 // 创建目录
 async function mkDir(path: string) {
+  if (!path.endsWith('/')) {
+    path = path + '/';
+  }
   const req = new rcp.Request(path, "MKCOL");
   return await rcpRequest(req);
 }
@@ -253,6 +259,14 @@ function doTask(uploadItem: UploadItemSendable): Promise<string> {
         uploadTask.delete().then()
         return resolve("SUCCESS")
       });
+      uploadTask.on('fail', (taskStates: Array<request.TaskState>) => {
+        // 删除文件
+        deleteFile(uploadItem.fileUri);
+        uploadTask.delete().then()
+        console.info("upOnFail taskState:" + JSON.stringify(taskStates[0]));
+        let err: BusinessError = {code: taskStates[0].responseCode, message: taskStates[0].message, name: "错误"};
+        reject(err);
+      });
       uploadTask.on("progress", (uploadedSize: number) => {
         // 更新已上传进度
         workerPort.postMessage({action: "UPDATE_PROGRESS", code: 200, message: "", uploadedSize: uploadedSize, taskItemId: uploadItem.taskItemId})
@@ -260,7 +274,7 @@ function doTask(uploadItem: UploadItemSendable): Promise<string> {
     } catch (error) {
       let err: BusinessError = error as BusinessError;
       console.error(`创建上传任务失败： ${uploadItem.fileUri} => ${uploadItem.remoteUri}, code is ${err.code}, message is ${err.message}`);
-      reject(error)
+      reject(error);
     }
   })
 }
