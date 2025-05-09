@@ -14,15 +14,15 @@
     },
     {
       "name": "internet_reason",
-      "value": "用于将用户相册备份到NAS"
+      "value": "用于连接用户的家庭服务器来备份或同步图片/视频嘞文件。"
     },
     {
       "name": "IMAGEVIDEO_reason",
-      "value": "读取相册内容并备份到NAS"
+      "value": "用于备份或同步图片/视频类文件到用户自己的家庭服务器中。"
     },
     {
       "name": "PERSISTENT_reason",
-      "value": "应用卸载时删除服务器登录账号登"
+      "value": "用于应用卸载时删除服务器登录账号和密码"
     },
     {
       "name": "BACKGROUND_reason",
@@ -30,7 +30,7 @@
     },
     {
       "name": "NETWORK_reason",
-      "value": "查询是否处于WIFI环境下"
+      "value": "用于查询是否处于WIFI环境下"
     },
     {
       "name": "EntryBackupFormAbility_desc",
@@ -46,7 +46,7 @@
     },
     {
       "name": "backupWidget_display_name",
-      "value": "backupWidget"
+      "value": "备份按钮"
     }
   ]
 }

@@ -18,9 +18,9 @@
         "name": "EntryAbility",
         "srcEntry": "./ets/entryability/EntryAbility.ets",
         "description": "$string:EntryAbility_desc",
-        "icon": "$media:icon",
+        "icon": "$media:layered_image",
         "label": "$string:EntryAbility_label",
-        "startWindowIcon": "$media:icon",
+        "startWindowIcon": "$media:app_icon",
         "startWindowBackground": "$color:start_window_background",
         "exported": true,
         //        "orientation": "auto_rotation",
@@ -42,13 +42,13 @@
     "extensionAbilities": [
       {
         "name": "EntryBackupAbility",
-        "srcEntry": "./ets/entrybackupability/EntryBackupAbility.ets",
-        "type": "backup",
+        "srcEntry": "./ets/entryformability/EntryFormAbility.ets",
+        "type": "form",
         "exported": false,
         "metadata": [
           {
-            "name": "ohos.extension.backup",
-            "resource": "$profile:backup_config"
+            "name": "ohos.extension.form",
+            "resource": "$profile:form_config"
           }
         ]
       }

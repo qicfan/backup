@@ -5,6 +5,22 @@
       "value": "#FFFFFF"
     },
     {
+      "name": "side_bar_background",
+      "value": "#0DFFFFFF"
+    },
+    {
+      "name": "normal_font_color",
+      "value": "#182431"
+    },
+    {
+      "name": "tab_background_color",
+      "value": "#F1F3F5"
+    },
+    {
+      "name": "tab_sel_color",
+      "value": "#ED6F21"
+    },
+    {
       "name": "ibest_black",
       "value": "#000"
     },

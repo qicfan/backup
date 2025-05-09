@@ -20,10 +20,10 @@ export struct Cell {
           .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
           .textAlign(TextAlign.Start)
           .width('100%')
-          .padding({
-            left: $r('app.float.normal_padding'),
-            right: $r('app.float.normal_padding'),
-          })
+          // .padding({
+          //   left: $r('app.float.normal_padding'),
+          //   right: $r('app.float.normal_padding'),
+          // })
       }
       Flex({
         direction: FlexDirection.Row,
@@ -84,6 +84,5 @@ export struct Cell {
       })
     }
     .margin({bottom: $r('app.float.normal_padding'), left: $r('app.float.normal_padding'), right:$r('app.float.normal_padding')})
-    .backgroundColor($r("app.color.ibest_background"))
   }
 }

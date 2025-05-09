@@ -15,6 +15,42 @@
     {
       "name": "font_size",
       "value": "14fp"
+    },
+    {
+      "name": "bottom_tab_bar_width_lg",
+      "value": "96vp"
+    },
+    {
+      "name": "tab_size_lg",
+      "value": "76vp"
+    },
+    {
+      "name": "tab_size",
+      "value": "56vp"
+    },
+    {
+      "name": "tab_height_lg",
+      "value": "100vp"
+    },
+    {
+      "name": "icon_tab_width",
+      "value": "24vp"
+    },
+    {
+      "name": "icon_tab_height",
+      "value": "24vp"
+    },
+    {
+      "name": "tab_font_size",
+      "value": "12fp"
+    },
+    {
+      "name": "tab_lg_font_size",
+      "value": "14fp"
+    },
+    {
+      "name": "tab_top_margin",
+      "value": "4vp"
     }
   ]
 }

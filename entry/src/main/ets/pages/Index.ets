@@ -10,13 +10,11 @@ import {
   LoginStatus,
   LowBatteryStop,
   OnlyWIFIBackup,
-  TaskDoing
 } from "../typing";
 import { Config } from "../models/Config";
 import { Settings } from "../components/Settings";
 import { Login } from "../components/Login";
 import { WebDav } from "../utils/webdav";
-import { TaskList } from "../components/TaskList";
 import { BusinessError, emitter } from "@kit.BasicServicesKit";
 import { Task } from "../models/Task";
 import { backgroundTaskManager } from "@kit.BackgroundTasksKit";
@@ -30,6 +28,7 @@ import { TipDialog } from "../dialogs/TipDialog";
 import { Dialog } from "../utils/dialog";
 import { Agreement } from "../components/Agreement";
 import { TaskUpload } from "../utils/taskUpload";
+import { Home } from "../components/Home";
 
 @Builder
 function buildTip(event: ()=>void) {
@@ -84,7 +83,10 @@ struct Index {
     });
     // 等开始收集相册内的新内容并生成任务
     emitter.on(Global.START_COLLECT_PHOTO_EVENT, () => {
-      this.startCreateTask().then()
+      this.initApp().then((rs: boolean) => {
+        if (!rs) return;
+        this.startCreateTask().then()
+      })
     })
 
     // 开始执行未完成的任务
@@ -103,7 +105,6 @@ struct Index {
   }
 
   async aboutToDisappear() {
-    console.log('app即将退出');
     if (this.global.processId > 0) {
       // 有正在运行的任务，结束任务
       await this.stopTaskEvent(this.global.processId, true, "APP退出")
@@ -405,8 +406,6 @@ struct Index {
         .then((res: backgroundTaskManager.ContinuousTaskNotification) => {
           this.notifyId = res.notificationId;
           this.jobId = res.continuousTaskId ? res.continuousTaskId : 1;
-          let c = 0;
-          let preC = 0;
           const updateProgressHandleId = setInterval(() => {
             if (this.notifyId <= 0) {
               console.log("任务已结束，清除定时通知系统任务进度")
@@ -481,50 +480,45 @@ struct Index {
 
   build() {
     Navigation(this.pageInfos) {
-      Column() {
-        TaskList()
-          .width('100%')
-          .layoutWeight(1)
-        Column() {
-          IBestButton({
-            text: '开始备份',
-            type: this.creatingTask ? 'default' : 'primary',
-            loadingText: this.loadingText,
-            loading: this.creatingTask
-          })
-            .onClick(() => {
-              this.global.taskGlobalStatus = TaskDoing.YES;
-              emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
-            })
-        }
-        .width('100%')
-        .margin({ bottom: $r("app.float.normal_padding") })
-      }
+      // Column() {
+      //   TaskList()
+      //     .width('100%')
+      //     .layoutWeight(1)
+      //   Column() {
+      //     IBestButton({
+      //       text: '开始备份',
+      //       type: this.creatingTask ? 'default' : 'primary',
+      //       loadingText: this.loadingText,
+      //       loading: this.creatingTask
+      //     })
+      //       .onClick(() => {
+      //         this.global.taskGlobalStatus = TaskDoing.YES;
+      //         emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
+      //       })
+      //   }
+      //   .width('100%')
+      //   .margin({ bottom: $r("app.float.normal_padding") })
+      // }
+      Home()
     }
-    .title("相册备份")
     .navDestination(this.PageMap)
     .mode(NavigationMode.Stack)
-    .menus([
-      {
-        value: "设置", icon: $r("app.media.gearshape"), action: () => {
-          this.pageInfos.pushPath({ name: "Settings" })
-        }
-      }
-    ])
-    .backgroundColor($r('app.color.ibest_background'))
+    .hideToolBar(true)
+    .hideTitleBar(true)
+    .hideBackButton(true)
     .width('100%')
     .height('100%')
-    .onNavBarStateChange(isVisible => {
-      if (!isVisible) return ;
-      if (this.appEnter) {
-        this.appEnter = false;
-      } else {
-        this.initApp().then(() => {
-          if (this.init === 3 ) {
-            emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
-          }
-        })
-      }
-    })
+    // .onNavBarStateChange(isVisible => {
+    //   if (!isVisible) return ;
+    //   if (this.appEnter) {
+    //     this.appEnter = false;
+    //   } else {
+    //     this.initApp().then(() => {
+    //       if (this.init === 3 ) {
+    //         emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
+    //       }
+    //     })
+    //   }
+    // })
   }
 }

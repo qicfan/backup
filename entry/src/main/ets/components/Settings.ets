@@ -2,7 +2,7 @@ import { IBestNotify, IBestPicker, IBestPickerOption, IBestPopup } from "@ibests
 import { Config } from "../models/Config";
 import { AUTOBackup, BackupType, ConfigGlobalStatus, LowBatteryStop, OnlyWIFIBackup } from "../typing"
 import { Cell } from "./Cell"
-import { AppStorageV2, ComponentContent } from "@kit.ArkUI";
+import { AppStorageV2, ComponentContent, ComposeTitleBar, EditableLeftIconType, EditableTitleBar } from "@kit.ArkUI";
 import { Dialog } from "../utils/dialog";
 import { FolderSelectDialog } from "../dialogs/FolderSelectDialog";
 import { ServerConfig } from "../models/Server";
@@ -29,7 +29,8 @@ export struct Settings {
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local backupTypeValue: string[] = [];
-  @Local showBackupTypePopup: boolean = false
+  @Local showBackupTypePopup: boolean = false;
+  scroller: Scroller = new Scroller();
   @Local backupTypeOptions: IBestPickerOption[] = [
     { text: '备份所有照片', value: "all" },
     { text: '备份新照片', value: "new" },
@@ -108,7 +109,6 @@ export struct Settings {
   }
 
   aboutToAppear(): void {
-    // console.log("设置页面加载")
     this.backupTypeValue = this.config.backupType == BackupType.ALL ? ['all'] : ['new']
   }
 
@@ -117,8 +117,8 @@ export struct Settings {
   }
 
   build() {
-    NavDestination() {
-      Scroll() {
+    Column() {
+      Scroll(this.scroller) {
         Column() {
           Cell({
             title: "服务器",
@@ -191,7 +191,7 @@ export struct Settings {
           Text("陕ICP备2025065287号-2A")
             .width('100%')
             .textAlign(TextAlign.Center)
-            .margin({top: $r('app.float.normal_padding'), bottom: $r('app.float.normal_padding')})
+            .margin({ top: $r('app.float.normal_padding'), bottom: $r('app.float.normal_padding') })
 
           // 弹出层
           IBestPopup({
@@ -200,31 +200,10 @@ export struct Settings {
             contentBuilder: (): void => this.pickerBuilder()
           })
         }
+        .padding({ bottom: 30 })
         .width('100%')
-        .height('100%')
       }
-      .width('100%')
-      .height('100%')
     }
-    .title("备份规则设置")
-    .menus([
-      {
-        value: "保存",
-        icon: $r("sys.media.ohos_ic_public_ok"),
-        action: () => {
-          if (this.config.backupRootPath !== "") {
-            this.global.configGlobalStatus = ConfigGlobalStatus.YES;
-            this.pageInfos.pop()
-          } else {
-            // 提示设置备份目录
-            IBestNotify.show({
-              message: "请设置备份路径",
-              duration: 3000
-            })
-          }
-        }
-      }
-    ])
-    .backgroundColor($r('app.color.ibest_background'))
+    .backgroundColor($r('app.color.ibest_white'))
   }
 }

@@ -1,27 +1,134 @@
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { AppStorageV2, window } from '@kit.ArkUI';
+import { AppStorageV2, display, window } from '@kit.ArkUI';
 import { IBestInit } from "@ibestservices/ibest-ui-v2";
 import { DB } from '../models/DB';
 import { SafeArea } from '../utils/safeArea';
-import { checkPermissions } from '../utils/permission';
+import { rpc } from '@kit.IPCKit';
+import { BusinessError } from '@kit.BasicServicesKit';
+import { BreakpointConstants } from '../common/BreakpointConstants';
+import { WinBreakpoint } from '../common/WinBreakpoint';
+import { WindowUtil } from '../utils/windowUtil';
 
 const DOMAIN = 0x0000;
+const TAG: string = 'WidgetEventCallEntryAbility';
+const DOMAIN_NUMBER: number = 0xFF00;
+const CONST_NUMBER_1: number = 1;
+const CONST_NUMBER_2: number = 2;
+// rpc通信返回类型的实现，用于rpc通信数据序列化和反序列化
+class MyParcelable implements rpc.Parcelable {
+  num: number;
+  str: string;
+
+  constructor(num: number, str: string) {
+    this.num = num;
+    this.str = str;
+  }
+
+  marshalling(messageSequence: rpc.MessageSequence): boolean {
+    messageSequence.writeInt(this.num);
+    messageSequence.writeString(this.str);
+    return true;
+  }
+
+  unmarshalling(messageSequence: rpc.MessageSequence): boolean {
+    this.num = messageSequence.readInt();
+    this.str = messageSequence.readString();
+    return true;
+  }
+}
 
 export default class EntryAbility extends UIAbility {
+  private windowObj?: window.Window;
+
+  private updateHeightBp(): void {
+    if (this.windowObj === undefined) {
+      return;
+    }
+    let mainWindow: window.WindowProperties = this.windowObj.getWindowProperties();
+    let windowHeight: number = mainWindow.windowRect.height;
+    let windowWidth: number = mainWindow.windowRect.width;
+    let windowWidthVp = windowWidth / display.getDefaultDisplaySync().densityPixels;
+    let windowHeightVp = windowHeight / display.getDefaultDisplaySync().densityPixels;
+    let heightBp: string = BreakpointConstants.BREAKPOINT_SM;
+    let aspectRatio: number = windowHeightVp / windowWidthVp;
+    if (aspectRatio < 0.8) {
+      heightBp = BreakpointConstants.BREAKPOINT_SM;
+    } else if (aspectRatio >= 0.8 && aspectRatio < 1.2) {
+      heightBp = BreakpointConstants.BREAKPOINT_MD;
+    } else {
+      heightBp = BreakpointConstants.BREAKPOINT_LG;
+    }
+    const winBP = AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance());
+    winBP!.currentHeightBreakpoint = heightBp;
+  }
+
+  private updateWidthBp(): void {
+    if (this.windowObj === undefined) {
+      return;
+    }
+    let mainWindow: window.WindowProperties = this.windowObj.getWindowProperties();
+    let windowWidth: number = mainWindow.windowRect.width;
+    let windowWidthVp = windowWidth / display.getDefaultDisplaySync().densityPixels;
+    let widthBp: string = BreakpointConstants.BREAKPOINT_XS;
+    if (windowWidthVp < 320) {
+      widthBp = BreakpointConstants.BREAKPOINT_XS;
+    } else if (windowWidthVp >= 320 && windowWidthVp < 600) {
+      widthBp = BreakpointConstants.BREAKPOINT_SM;
+    } else if (windowWidthVp >= 600 && windowWidthVp < 840) {
+      widthBp = BreakpointConstants.BREAKPOINT_MD;
+    } else if (windowWidthVp >= 840 && windowWidthVp < 1440) {
+      widthBp = BreakpointConstants.BREAKPOINT_LG;
+    } else {
+      widthBp = BreakpointConstants.BREAKPOINT_XL;
+    }
+    let winBP = AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance());
+    winBP!.currentWidthBreakpoint = widthBp;
+  }
+
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     // checkPermissions(this.context, 'ohos.permission.READ_IMAGEVIDEO'); // 申请权限
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
+    AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance());
+    try {
+      // 监听call事件所需的方法并调用
+      this.callee.on('backup', (data: rpc.MessageSequence) => {
+        // 获取call事件中传递的所有参数
+        hilog.info(DOMAIN_NUMBER, TAG, `backup param:  ${JSON.stringify(data.readString())}`);
+        return new MyParcelable(CONST_NUMBER_1, 'aaa');
+      });
+    } catch (err) {
+      hilog.error(DOMAIN_NUMBER, TAG, `Failed to register callee on. Cause: ${JSON.stringify(err as BusinessError)}`);
+    }
   }
 
   onDestroy(): void {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
+    try {
+      this.callee.off('backup');
+    } catch (err) {
+      hilog.error(DOMAIN_NUMBER, TAG, `Failed to register callee off. Cause: ${JSON.stringify(err as BusinessError)}`);
+    }
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
     // Main window is created, set main page for this ability
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
+    windowStage.getMainWindow().then((data: window.Window) => {
+      this.windowObj = data;
+      this.updateWidthBp();
+      this.updateHeightBp();
+      this.windowObj.on('windowSizeChange', (windowSize: window.Size) => {
+        this.updateWidthBp();
+        this.updateHeightBp();
+      })
+    })
+    let windowUtil: WindowUtil | undefined = WindowUtil.getInstance();
+    if (windowUtil !== undefined) {
+      windowUtil.setWindowStage(windowStage);
+      windowUtil.setMainWindowPortrait();
+    }
     // 初始化数据库
     DB.init(this.context).then(() => {
       windowStage.loadContent('pages/Index', (err) => {
@@ -56,6 +163,11 @@ export default class EntryAbility extends UIAbility {
   onWindowStageDestroy(): void {
     // Main window is destroyed, release UI related resources
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
+    try {
+      this.callee.off('funA');
+    } catch (err) {
+      hilog.error(DOMAIN_NUMBER, TAG, `Failed to register callee off. Cause: ${JSON.stringify(err as BusinessError)}`);
+    }
   }
 
   onForeground(): void {

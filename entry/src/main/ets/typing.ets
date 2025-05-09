@@ -66,3 +66,13 @@ export interface UploadQueueItem {
   uploadItem: UploadItemSendable,
   taskItem: TaskItem
 }
+
+export interface WindowBreakpoint {
+  currentHeightBreakpoint: string
+  currentWidthBreakpoint: string
+}
+export interface TabItem {
+  icon: Resource
+  selectedIcon: Resource
+  name: string
+}
