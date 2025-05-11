@@ -49,19 +49,11 @@ export class Photos {
         item.dateModified = ps.get('date_modified') as number;
         item.size = ps.get('size') as number;
         item.status = TaskItemStatus.WAIT;
-        item.makeUri(ctx)
-        // // 处理动态图片
-        // if (item.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
-        //   // 保存动态图片的视频
-        //   const videoSize = await Photos.saveMovingPhotoVideoByAsset(ctx, ps, item.videoUri);
-        //   if (videoSize === -1) {
-        //     continue;
-        //   }
-        //   item.videoSize = videoSize;
-        // } else {
-        //   item.videoSize = 0;
-        // }
-        items.push(item)
+        item.makeUri(ctx);
+        const rs = await item.save();
+        if (rs) {
+          items.push(item);
+        }
       }
     } catch (e) {
       let err = e as BusinessError;
@@ -106,7 +98,7 @@ export class Photos {
               console.error("读取动态图片数据出错，请检查该图片是否存在或重试")
               return resolve(-1);
             }
-            console.info(`读取动态图片${asset.get('uri')}的视频，视频本地路径:${videoUri}`)
+            // console.info(`读取动态图片${asset.get('uri')}的视频，视频本地路径:${videoUri}`)
             movingPhoto.requestContent(photoAccessHelper.ResourceType.VIDEO_RESOURCE, videoUri).then(() => {
               // 读取文件大小返回
               const size = fileSize(videoUri);
@@ -174,7 +166,7 @@ export class Photos {
             if (movingPhoto === undefined) {
               resolve("读取动态图片数据出错，请检查该图片是否存在或重试")
             }
-            console.info(`读取动态图片${uri}，图片：${movingPhoto.getUri()}=>${imageUri}, 视频:${videoUri}`)
+            // console.info(`读取动态图片${uri}，图片：${movingPhoto.getUri()}=>${imageUri}, 视频:${videoUri}`)
             movingPhoto.requestContent(imageUri, videoUri).then(() => {
               resolve("success")
             }).catch((err: BusinessError) => {

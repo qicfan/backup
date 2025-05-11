@@ -6,8 +6,6 @@ import { WorkerPool } from "./workerPool";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
-import { relationalStore } from "@kit.ArkData";
-import { Task } from "../models/Task";
 import { WebDav } from "./webdav";
 import { IBestNotify } from "@ibestservices/ibest-ui-v2";
 import { getBatteryLevel, getCurrentNetType } from "./tools";
@@ -74,7 +72,7 @@ export class TaskUpload {
     return true;
   }
 
-  async start(context: Context, task: Task) {
+  async start(context: Context) {
     if (!this.checkBattery()) {
       console.warn(`开启了低电量停止备份，检测到当前电量低于15%，无法启动备份`)
       return;
@@ -84,9 +82,7 @@ export class TaskUpload {
       return;
     }
     console.info("开始上传照片");
-    // 将任务标记为开始执行
-    await task.start();
-    console.log(`任务 ${task.id} 开始执行...`)
+    console.log(`taskUpload 任务开始执行...`)
     const auth = this.webdav.getBase64Auth();
     // 复制队列出现空闲线程
     emitter.on(Global.BACKUP_COPY_WORKER_IDLE, async () => {
@@ -130,15 +126,15 @@ export class TaskUpload {
           // 上传和复制队列都空，检查是否有正在运行的线程
           const idleCopyCount = this.fileWorkerPool.idleCopyCount();
           const idleUploadCount = this.uploadWorkerPool.idleUploadCount();
-          console.log(`复制和上传队列都空，空闲线程： copy=${idleCopyCount}, upload=${idleUploadCount}`)
-          if (idleCopyCount == this.fileWorkerPool.current && idleUploadCount === this.uploadWorkerPool.current) {
+          console.log(`复制和上传队列都空，空闲线程： copy=${idleCopyCount}/${this.fileWorkerPool.copyCurrent}, upload=${idleUploadCount}/${this.uploadWorkerPool.current}`)
+          if (idleCopyCount == this.fileWorkerPool.copyCurrent && idleUploadCount === this.uploadWorkerPool.current) {
             console.log(`已经没有任何活跃线程，任务已经结束。`)
             // 终止所有复制线程
             this.fileWorkerPool.clear();
             // 终止所有上传线程
             this.uploadWorkerPool.clear();
             // 如果线程全部空闲，则代表任务已经结束
-            emitter.emit(Global.BACKUP_TASK_FINISH, {data: {taskId: task.id}});
+            emitter.emit(Global.BACKUP_TASK_FINISH);
           }
         }
         return ;
@@ -147,12 +143,7 @@ export class TaskUpload {
       const uploadQueueItem: UploadQueueItem = this.uploadItemQueue.pop();
       const uploadItem = uploadQueueItem.uploadItem;
       const taskItem = uploadQueueItem.taskItem;
-      const curTask = await Task.getById(taskItem.taskId);
-      if (!curTask) {
-        console.log(`上传队列查询task不存在，${taskItem.taskId}`);
-        return;
-      }
-      const isSuc: boolean = this.uploadWorkerPool.execute(uploadItem, curTask, taskItem);
+      const isSuc: boolean = this.uploadWorkerPool.execute(uploadItem, taskItem);
       if (!isSuc) {
         console.log(`没有空闲的上传线程，放回上传队列`)
         this.uploadItemQueue.add(uploadQueueItem);
@@ -164,69 +155,70 @@ export class TaskUpload {
       console.log(`收到复制完成消息，将该任务放入上传队列2，${taskItemId}`)
       const taskItem = await TaskItem.getById(taskItemId);
       if (!taskItem) return;
-      const curTask = await Task.getById(taskItem.taskId);
-      if (!curTask) return;
       const uploadItem = new UploadItemSendable(context, taskItem, auth);
       // 触发执行
-      const rs = this.uploadWorkerPool.execute(uploadItem, curTask, taskItem);
+      const rs = this.uploadWorkerPool.execute(uploadItem, taskItem);
       if (!rs) {
-        console.log(`没有空闲的上传线性，将复制完成的任务放回上传队列`)
+        // console.log(`没有空闲的上传线程，将复制完成的任务放回上传队列`)
         this.uploadItemQueue.add({uploadItem: uploadItem, taskItem: taskItem});
       }
       if (taskItem.subType === photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
-        console.log(`将动态图的视频放入上传队列`)
+        // console.log(`将动态图的视频放入上传队列`)
         const uploadItem = new UploadItemSendable(context, taskItem, auth, 2);
         // 触发执行
-        const rs = this.uploadWorkerPool.execute(uploadItem, curTask, taskItem);
+        const rs = this.uploadWorkerPool.execute(uploadItem, taskItem);
         if (!rs) {
-          console.log(`没有空闲的上传线性，将复制完成的动态图的视频放回上传队列`)
+          // console.log(`没有空闲的上传线性，将复制完成的动态图的视频放回上传队列`)
           this.uploadItemQueue.add({uploadItem: uploadItem, taskItem: taskItem});
         }
       }
     })
     let pause: boolean = false;
     // 处理暂停事件
-    emitter.on(Global.BACKUP_PAUSE, (data) => {
+    emitter.on(Global.BACKUP_PAUSE, () => {
       pause = true;
       // 终止所有复制线程
-      this.fileWorkerPool.clear();
+      this.fileWorkerPool.stop();
       // 终止所有上传线程
-      this.uploadWorkerPool.clear();
-      // 任务定义未失败
-      // task.finish(data.data?.reason)
+      this.uploadWorkerPool.stop();
       // 清空队列
       while(true) {
         if (this.copyImageQueue.length === 0) {
           break;
         } else {
-          this.copyImageQueue.pop();
+          const taskItem: TaskItem = this.copyImageQueue.pop();
+          taskItem.wait().then(() => {
+            emitter.emit(Global.UPDATE_TASK_ITEM_EVENT, {data: {id: taskItem.id}})
+          })
         }
       }
       while(true) {
         if (this.uploadItemQueue.length === 0) {
           break;
         } else {
-          this.uploadItemQueue.pop();
+          const item = this.uploadItemQueue.pop();
+          item.taskItem.wait().then(() => {
+            emitter.emit(Global.UPDATE_TASK_ITEM_EVENT, {data: {id: item.taskItem.id}})
+          })
         }
       }
+      // 所有UPLOADING 改为 WAIT
+      TaskItem.uploadingToWait().then(() => {})
     })
     let page = 1;
     let pageSize = 1000;
     while (true) {
       if (pause) break;
-      await task.fetch()
-      const rs: relationalStore.ResultSet | null = await task.getWaitItems(page, pageSize)
-      let count: number = 0;
-      if (rs !== null) count = rs.rowCount;
+      const items: TaskItem[] = await TaskItem.getWaitList(page, pageSize)
+      let count: number = items.length;
       console.log(`第${page}页查询到${count}条数据`)
       if (count === 0) break;
-      while (rs?.goToNextRow()) {
-        const taskItem = TaskItem.getInstance(rs);
-        taskItem.task = task;
+      for (let i=0; i<count; i++) {
+        const taskItem = items[i];
+        if (!taskItem) continue;
         // 加入文件复制队列
         this.copyImageQueue.add(taskItem);
       }
-      rs?.close();
       if (count === pageSize) {
         page++;
       } else {

@@ -18,7 +18,7 @@ const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
  * @param event message data
  */
 workerPort.onmessage = (event: MessageEvents) => {
-  console.log(`上传线程收到消息：${JSON.stringify(event.data)}`)
+  // console.log(`上传线程收到消息：${JSON.stringify(event.data)}`)
   doTask(event.data).then((rs) => {
     if (rs === "SUCCESS") {
       workerPort.postMessage({action: "FINISH", code: 200, message: "", taskItemId: event.data.taskItemId, type: event.data.type});
@@ -97,7 +97,7 @@ async function mkRemotePath(uploadItem: UploadItemSendable): Promise<boolean> {
       return false;
     }
   }
-  console.log(`创建远程目录: ${currentPath}成功`)
+  // console.log(`创建远程目录: ${currentPath}成功`)
   return true;
 }
 
@@ -158,12 +158,12 @@ async function rcpRequest(req: rcp.Request) {
 
 // 是否存在
 async function fileExists(path: string, size: number) {
-  console.log(`查询${path}是否存在`)
+  // console.log(`查询${path}是否存在`)
   const req = new rcp.Request(path, "HEAD");
   const rr = await rcpRequest(req);
   // 不存在
   if (!rr.success) {
-    console.log(`文件请求不成功，code: ${rr.statusCode}, msg: ${rr.message}`)
+    // console.log(`文件请求不成功，code: ${rr.statusCode}, msg: ${rr.message}`)
     return 0;
   }
   let remoteSize: number = 0;
@@ -175,7 +175,7 @@ async function fileExists(path: string, size: number) {
   } else {
     remoteSize = parseInt(remoteSizeArr)
   }
-  console.log(`文件存在，比较大小是否一致, ${remoteSize}=>${size}`)
+  // console.log(`文件存在，比较大小是否一致, ${remoteSize}=>${size}`)
   if (remoteSize == size) {
     return 1
   } else {
@@ -188,7 +188,7 @@ async function colExists(path: string) {
   if (!path.endsWith('/')) {
     path = path + '/';
   }
-  console.log(`查询${path}是否存在`)
+  // console.log(`查询${path}是否存在`)
   const req = new rcp.Request(path, "HEAD");
   const rr = await rcpRequest(req);
   return rr.success;
@@ -221,7 +221,7 @@ function doTask(uploadItem: UploadItemSendable): Promise<string> {
     const context: common.Context = sendableContextManager.convertToContext(uploadItem.sendableContext);
     const filesDir: string = context.cacheDir;
     const fileUri = uploadItem.fileUri.replace(filesDir, 'internal://cache')
-    console.log(`cacheDir: ${filesDir}, fileUri: ${uploadItem.fileUri}=>${fileUri}`);
+    // console.log(`cacheDir: ${filesDir}, fileUri: ${uploadItem.fileUri}=>${fileUri}`);
     updateSerConfig(uploadItem.serverBaseUrl, uploadItem.serverUsername, uploadItem.serverPassword);
     try {
       const mkRP = await mkRemotePath(uploadItem);
@@ -231,14 +231,14 @@ function doTask(uploadItem: UploadItemSendable): Promise<string> {
       // 检查文件是否已存在
       let existsRR: number = await fileExists(uploadItem.remoteUri, uploadItem.fileSize);
       if (existsRR === 2) {
-        console.log(`${uploadItem.remoteUri}在服务器上存在，但是大小和本地不同，删除服务端文件。`)
+        // console.log(`${uploadItem.remoteUri}在服务器上存在，但是大小和本地不同，删除服务端文件。`)
         // 存在，不一致，删除远程文件
         await rcpDelete(uploadItem.remoteUri)
         existsRR = 0;
       }
       if (existsRR === 1) {
         // 已经上传完成
-        console.log(`服务器上存在${uploadItem.remoteUri}，直接返回成功`)
+        // console.log(`服务器上存在${uploadItem.remoteUri}，直接返回成功`)
         return resolve("SUCCESS");
       }
     } catch (e) {

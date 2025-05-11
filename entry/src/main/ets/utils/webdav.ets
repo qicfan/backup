@@ -126,7 +126,7 @@ export class WebDav {
 
   // 验证服务器和验证方式是否可用
   public async valid() {
-    const req = new rcp.Request('/', "PROPFIND", { "Depth": "0" });
+    const req = new rcp.Request('/', "PROPFIND", { "Depth": "1" });
     return await this.request(req);
   }
 
@@ -305,7 +305,6 @@ export class WebDav {
     const rr: RequestReturn = await this.uploadBySys(ctx, taskItem.name, remoteUri, filePath, (transferredSize: number) => {
         if (type === 'default') {
           taskItem.updateUploadedSize(transferredSize)
-          taskItem.task.updateUploadedSize(transferredSize)
         }
     });
     deleteFile(filePath);

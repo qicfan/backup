@@ -1,34 +1,24 @@
-import { IBestButton, IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
+import { IBestNotify } from "@ibestservices/ibest-ui-v2";
 import { ServerConfig } from "../models/Server";
 import { AppStorageV2, ComponentContent } from "@kit.ArkUI";
 import { common, WantAgent, wantAgent } from "@kit.AbilityKit";
 import { Global } from "../models/Global";
 import {
-  AccessStatus,
-  AUTOBackup,
   ConfigGlobalStatus,
   LoginStatus,
-  LowBatteryStop,
-  OnlyWIFIBackup,
 } from "../typing";
 import { Config } from "../models/Config";
-import { Settings } from "../components/Settings";
 import { Login } from "../components/Login";
 import { WebDav } from "../utils/webdav";
 import { BusinessError, emitter } from "@kit.BasicServicesKit";
-import { Task } from "../models/Task";
 import { backgroundTaskManager } from "@kit.BackgroundTasksKit";
 import { notificationManager } from "@kit.NotificationKit";
-import { checkPermissions } from "../utils/permission";
-import { getBatteryLevel, getCurrentNetType } from "../utils/tools";
-import { connection } from "@kit.NetworkKit";
 import { Privacy } from "../components/Privacy";
-import { TaskFiles } from "../components/TaskFiles";
 import { TipDialog } from "../dialogs/TipDialog";
 import { Dialog } from "../utils/dialog";
 import { Agreement } from "../components/Agreement";
-import { TaskUpload } from "../utils/taskUpload";
 import { Home } from "../components/Home";
+import { TaskItem } from "../models/TaskItem";
 
 @Builder
 function buildTip(event: ()=>void) {
@@ -45,12 +35,10 @@ struct Index {
   private ctxUIAbility: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack()
   @Local creatingTask: boolean = false;
-  @Local loadingText: string = "开始备份"
 
   private notifyId: number = 0;
   private jobId: number = 0;
   private init: number = 0; // 0-未开始, 1-未设置服务器, 2-未完善色湖之，3-初始化成功
-  private appEnter: boolean = true;
 
   // 登录弹窗的节点
   private tipDialogContentNode: ComponentContent<Object> =
@@ -77,37 +65,18 @@ struct Index {
   }
 
   aboutToAppear() {
-    this.initApp().then(() => {
-      // 修复意外退出的任务状态
-      Task.repair(this.global.processId).then();
-    });
-    // 等开始收集相册内的新内容并生成任务
-    emitter.on(Global.START_COLLECT_PHOTO_EVENT, () => {
-      this.initApp().then((rs: boolean) => {
-        if (!rs) return;
-        this.startCreateTask().then()
-      })
-    })
-
-    // 开始执行未完成的任务
-    emitter.on(Global.START_WAIT_TASK_EVENT, (data) => {
-      console.log("收到开始任务通知：" + data.data?.id)
-      const taskId: number = data.data?.id;
-      this.startTask(taskId)
-    })
-
+    this.initApp().then(() => {});
     // 暂停任务
-    emitter.on(Global.STOP_TASK_EVENT, (data) => {
-      console.log("收到暂停任务通知：" + data.data?.id)
-      const taskId: number = data.data?.id;
-      this.stopTaskEvent(taskId, true, "手动点击暂停")
+    emitter.on(Global.STOP_TASK_EVENT, () => {
+      console.log("收到暂停任务通知")
+      this.stopTaskEvent()
     })
   }
 
   async aboutToDisappear() {
     if (this.global.processId > 0) {
       // 有正在运行的任务，结束任务
-      await this.stopTaskEvent(this.global.processId, true, "APP退出")
+      await this.stopTaskEvent()
     }
   }
 
@@ -182,7 +151,8 @@ struct Index {
     if (configExists === 0) {
       // 不存在设置，跳转到设置页面
       this.init = 2;
-      this.pageInfos.pushPath({ name: "Settings" })
+      // this.pageInfos.pushPath({ name: "Settings" })
+      this.global.tabIndex = 2;
       return false;
     }
     if (configExists === 2) {
@@ -191,7 +161,7 @@ struct Index {
         message: "您还没有设置备份路径"
       })
       this.init = 2;
-      this.pageInfos.pushPath({ name: "Settings" })
+      this.global.tabIndex = 2;
       return false;
     }
     this.global.configGlobalStatus = ConfigGlobalStatus.YES
@@ -199,189 +169,24 @@ struct Index {
     return true;
   }
 
-  checkPerm(): Promise<boolean> {
-    return new Promise((resolve) => {
-      checkPermissions(this.ctxUIAbility, 'ohos.permission.READ_IMAGEVIDEO').then((rs) => {
-        if (rs) {
-          this.global.AccessStatus = AccessStatus.YES;
-          resolve(true)
-        } else {
-          IBestNotify.show({
-            message: "未授权访问相册，请到'设置 > 应用和元服务 > 相册备份'中打开'图片和视频 -> 仅读取'权限后再重新打开本应用",
-            type: "warning",
-            duration: 3000
-          })
-          this.global.AccessStatus = AccessStatus.NO;
-          resolve(false);
-        }
-      })
-    })
-  }
-
-  checkBattery() {
-    if (this.config.lowBatteryStop === LowBatteryStop.YES) {
-      if (getBatteryLevel() <= 15) {
-        IBestNotify.show({
-          message: "已打开低电量不备份，当前电量低于15%，不启动备份任务",
-          type: "warning",
-          duration: 3000
-        })
-        return false;
-      }
-    }
-    return true;
-  }
-
-  async checkWifi() {
-    if (this.config.onlyWifi === OnlyWIFIBackup.YES) {
-      const netType = await getCurrentNetType();
-      if (netType == connection.NetBearType.BEARER_CELLULAR) {
-        IBestNotify.show({
-          message: "已打开仅wifi备份，当前使用移动网络，不启动备份任务",
-          type: "warning",
-          duration: 3000
-        })
-        return false;
-      }
-    }
-    return true;
-  }
-
-  // 是否开源收集照片并生成任务
-  async canCreateTask(): Promise<boolean> {
-    if (!this.init) {
-      return false;
-    }
-    // 检查是否授权读取相册
-    if (!(await this.checkPerm())) {
-      return false;
-    }
-    // 如果正在创建备份任务
-    if (this.creatingTask) {
-      return false;
-    }
-    return true;
-  }
-
-  async startCreateTask(): Promise<boolean> {
-    if (!(await this.canCreateTask())) {
-      return false;
-    }
-    animateTo({ duration: 1000, curve: Curve.EaseIn }, () => {
-      this.creatingTask = true;
-      this.loadingText = "正在扫描新照片并生成备份任务...";
-    })
-
-    try {
-      await Task.createTask(this.ctxUIAbility, this.config)
-    } catch (e) {
-
-    } finally {
-      animateTo({ duration: 1000, curve: Curve.EaseIn }, () => {
-        this.creatingTask = false;
-        this.loadingText = "开始备份";
-      })
-      setTimeout(() => {
-        IBestNotify.close();
-        if (this.config.auto === AUTOBackup.YES) {
-          // 触发任务执行
-          emitter.emit(Global.START_WAIT_TASK_EVENT);
-        }
-      }, 1000)
-    }
-    return true;
-  }
-
-  // 是否开源启动任务执行
-  async canStart(): Promise<boolean> {
-    // 检查是否授权读取相册
-    if (!(await this.checkPerm())) {
-      console.error(`没有授权相册，无法执行任务`);
-      return false;
-    }
-    // 如果打开了低电量暂停任务，则检查电量
-    if (!this.checkBattery()) {
-      console.error(`电量不足15%，无法执行任务`);
-      return false;
-    }
-    // 如果打开了仅WIFI备份，则检查网络状态
-    if (!(await this.checkWifi())) {
-      console.error(`非WIFI，无法执行任务`);
-      return false;
-    }
-    if (!this.config.backupRootPath) {
-      IBestToast.show({
-        message: "请先设置备份路径",
-        type: "warning",
-        duration: 3000
-      })
-      return false;
-    }
-    return true;
-  }
-
-  // 开始任务
-  async startTask(taskId?: number): Promise<boolean> {
-    if (!(await this.canStart())) {
-      return false;
-    }
-    let waitTask: Task | undefined;
-    if (!taskId) {
-      waitTask = await Task.oneWaitTask();
-    } else {
-      waitTask = new Task();
-      waitTask.id = taskId;
-      await waitTask.fetch()
-    }
-    if (waitTask === undefined) {
-      // 没有要执行的任务
-      console.log("没有要执行的任务");
-      return false;
-    }
-    console.log("开始执行任务：" + waitTask.id)
-    this.global.processId = waitTask.id;
-    emitter.on(Global.BACKUP_TASK_FINISH, (data) => {
-      this.stopTaskEvent(data.data?.id, false);
-      emitter.off(Global.BACKUP_TASK_FINISH);
-    });
-    (TaskUpload.getInstance()).start(this.ctxUIAbility, waitTask);
-    return true;
+  // 停止任务
+  async stopTaskEvent() {
+    await this.stopTask();
   }
 
   // 停止任务
-  async stopTaskEvent(taskOrId: number | Task, pause: boolean = false, reason: string = "") {
-    if (pause) {
-      emitter.emit(Global.BACKUP_PAUSE);
-    }
-    let task: Task;
-    if (typeof taskOrId == "number") {
-      task = new Task();
-      task.id = taskOrId;
-      await task.fetch()
-    } else {
-      task = taskOrId;
-    }
-    await this.stopTask(task, reason);
-  }
-
-  // 停止任务
-  async stopTask(task: Task, reason: string) {
+  async stopTask() {
     this.notifyId = 0;
     this.jobId = 0;
     this.global.processId = 0;
-    await task.finish(reason);
     if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask") && this.jobId > 0) {
       // 取消长时任务
       backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
     }
-    // 触发UI刷新
-    emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
   }
 
   // 启动长时任务
   async startBackground() {
-    const task = await Task.getById(this.global.processId);
-    if (!task) return;
     const wantAgentInfo: wantAgent.WantAgentInfo = {
       wants: [{ bundleName: this.ctxUIAbility.abilityInfo.bundleName, abilityName: this.ctxUIAbility.abilityInfo.name }],
       actionType: wantAgent.OperationType.START_ABILITY, requestCode: 0,
@@ -392,14 +197,7 @@ struct Index {
       // 标记任务状态，然后停止上传
       console.log(`收到取消长时任务的通知，停止执行当前任务，信息：${JSON.stringify(info)}`);
       console.log(`当前执行的长时任务ID：${this.notifyId}，要取消的长时任务ID${info.id}`)
-      const reasonMap: Map<number, string> = new Map();
-      reasonMap.set(2, "系统取消")
-      reasonMap.set(1, "用户取消")
-      reasonMap.set(3, "用户移除通知，取消任务")
-      reasonMap.set(4, "数据传输速率低或长时间没有上传文件，取消任务")
-      if (info.id === this.jobId) {
-        this.stopTaskEvent(task, true, `系统原因=>${reasonMap.get(info.reason)}`);
-      }
+      this.stopTaskEvent();
     });
     wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent) => {
       backgroundTaskManager.startBackgroundRunning(this.ctxUIAbility, ["dataTransfer"], wantAgentObj)
@@ -413,10 +211,7 @@ struct Index {
               return;
             }
             // 每秒更新一次任务进度
-            this.updateNotifyProcess(task);
-            // 触发UI更新
-            emitter.emit(Global.UPDATE_TASK_EVENT, { data: { id: task.id } })
-            return;
+            this.updateNotifyProcess();
           }, 1000);
         })
         .catch((error: BusinessError) => {
@@ -428,16 +223,17 @@ struct Index {
   }
 
   // 应用更新通知栏进度
-  updateNotifyProcess(task: Task) {
+  updateNotifyProcess() {
     // 应用定义下载类通知模版
-    const cur = task.suc + task.fail
-    const process: number = parseFloat(((cur / task.total) * 100).toFixed(2));
+    const total = TaskItem.getWaitCount();
+    const cur = this.global.preTotal - total;
+    const progress = Math.floor(100 - (total / this.global.preTotal * 100))
     let downLoadTemplate: notificationManager.NotificationTemplate = {
       name: 'downloadTemplate', // 当前只支持downloadTemplate，保持不变
       data: {
         title: `正在备份照片`, // 必填。
-        fileName: `进度：${cur}/${task.total}`, // 必填。
-        progressValue: process, // 应用更新进度值，自定义。
+        fileName: `进度：${cur}/${this.global.preTotal}`, // 必填。
+        progressValue: progress, // 应用更新进度值，自定义。
       }
     };
     let request: notificationManager.NotificationRequest = {
@@ -447,9 +243,9 @@ struct Index {
         systemLiveView: {
           typeCode: 8, // 上传下载类型需要填写 8，当前仅支持此类型。保持不变
           title: "正在备份照片", // 应用自定义
-          text: `进度：${cur}/${task.total}`, // 应用自定义
+          text: `进度：${cur}/${this.global.preTotal}`, // 应用自定义
           capsule: {
-            title: `备份进度：${cur}/${task.total}`
+            title: `备份进度：${cur}/${this.global.preTotal}`
           }
         }
       },
@@ -467,12 +263,8 @@ struct Index {
   PageMap(name: string) {
     if (name === "login") {
       Login()
-    } else if (name === "Settings") {
-      Settings()
     } else if (name === "PrivacyComponent") {
       Privacy()
-    } else if(name == "TaskFiles") {
-      TaskFiles()
     } else if(name == "agreement") {
       Agreement()
     }
@@ -480,25 +272,6 @@ struct Index {
 
   build() {
     Navigation(this.pageInfos) {
-      // Column() {
-      //   TaskList()
-      //     .width('100%')
-      //     .layoutWeight(1)
-      //   Column() {
-      //     IBestButton({
-      //       text: '开始备份',
-      //       type: this.creatingTask ? 'default' : 'primary',
-      //       loadingText: this.loadingText,
-      //       loading: this.creatingTask
-      //     })
-      //       .onClick(() => {
-      //         this.global.taskGlobalStatus = TaskDoing.YES;
-      //         emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
-      //       })
-      //   }
-      //   .width('100%')
-      //   .margin({ bottom: $r("app.float.normal_padding") })
-      // }
       Home()
     }
     .navDestination(this.PageMap)
@@ -508,17 +281,5 @@ struct Index {
     .hideBackButton(true)
     .width('100%')
     .height('100%')
-    // .onNavBarStateChange(isVisible => {
-    //   if (!isVisible) return ;
-    //   if (this.appEnter) {
-    //     this.appEnter = false;
-    //   } else {
-    //     this.initApp().then(() => {
-    //       if (this.init === 3 ) {
-    //         emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
-    //       }
-    //     })
-    //   }
-    // })
   }
 }

@@ -44,13 +44,10 @@ export struct Settings {
     2: "只备份当前时间后新增的照片，后续为增量"
   }
   private ctx: UIContext = this.getUIContext();
-  // 登录弹窗的节点
-  private selectDirDialogContentNode: ComponentContent<Object> =
-    new ComponentContent(this.ctx, wrapBuilder(buildDirSelect), new Params(this.config.backupRootPath))
 
   private openFolderSelectDialog() {
     Dialog.setContext(this.ctx);
-    Dialog.setContentNode(this.selectDirDialogContentNode);
+    Dialog.setContentNode(new ComponentContent(this.ctx, wrapBuilder(buildDirSelect), new Params(this.config.backupRootPath)));
     Dialog.setOptions({
       alignment: DialogAlignment.BottomStart,
       isModal: true,

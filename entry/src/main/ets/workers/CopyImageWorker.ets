@@ -16,7 +16,6 @@ const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
  */
 workerPort.onmessage = (event: MessageEvents) => {
   const copyItem: CopyItemSendable = event.data;
-  // console.log(`复制线程收到消息：${JSON.stringify(copyItem)}`)
   copyFile(event.data).then((msg) => {
     workerPort.postMessage(msg);
   })

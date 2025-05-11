@@ -53,7 +53,8 @@ export struct Login {
       if (this.pop) {
         this.pageInfos.pop();
       } else {
-        this.pageInfos.replacePath({ name: "Settings", param: true})
+        this.global.tabIndex = 2;
+        this.pageInfos.pop();
       }
     } catch (error) {
       let err = error as BusinessError;

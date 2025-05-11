@@ -14,7 +14,7 @@ const DOMAIN = 0x0000;
 const TAG: string = 'WidgetEventCallEntryAbility';
 const DOMAIN_NUMBER: number = 0xFF00;
 const CONST_NUMBER_1: number = 1;
-const CONST_NUMBER_2: number = 2;
+
 // rpc通信返回类型的实现，用于rpc通信数据序列化和反序列化
 class MyParcelable implements rpc.Parcelable {
   num: number;
@@ -61,6 +61,9 @@ export default class EntryAbility extends UIAbility {
     }
     const winBP = AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance());
     winBP!.currentHeightBreakpoint = heightBp;
+    winBP!.width = windowWidthVp;
+    winBP!.height = windowHeightVp;
+    winBP!.updateImageSize();
   }
 
   private updateWidthBp(): void {
@@ -84,6 +87,8 @@ export default class EntryAbility extends UIAbility {
     }
     let winBP = AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance());
     winBP!.currentWidthBreakpoint = widthBp;
+    winBP!.width = windowWidthVp;
+    winBP!.updateImageSize();
   }
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -147,13 +152,16 @@ export default class EntryAbility extends UIAbility {
         type = window.AvoidAreaType.TYPE_SYSTEM; // 以状态栏避让为例
         avoidArea = windowClass.getWindowAvoidArea(type);
         let topRectHeight = avoidArea.topRect.height; // 获取状态栏区域高度
-        AppStorageV2.connect(SafeArea, () => new SafeArea(topRectHeight, bottomRectHeight))
+        const safeArea = AppStorageV2.connect(SafeArea, () => SafeArea.getInstance())!
+        safeArea.top = topRectHeight;
+        safeArea.bottom = bottomRectHeight;
         windowClass.on('avoidAreaChange', (data) => {
           if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
             let topRectHeight = data.area.topRect.height;
+            safeArea.top = topRectHeight;
           } else if (data.type == window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
             let bottomRectHeight = data.area.bottomRect.height;
-            AppStorageV2.connect(SafeArea, () => new SafeArea(topRectHeight, bottomRectHeight))
+            safeArea.bottom = bottomRectHeight;
           }
         });
       });

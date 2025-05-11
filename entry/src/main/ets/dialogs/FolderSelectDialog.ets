@@ -2,10 +2,12 @@ import { IBestDialog, IBestLoading, IBestNotify, IBestToast } from "@ibestservic
 import { BusinessError, deviceInfo } from "@kit.BasicServicesKit"
 import { SafeArea } from "../utils/safeArea";
 import { AppStorageV2, EditableLeftIconType, EditableTitleBar } from "@kit.ArkUI";
-import { WebDav, WebDavResource } from "../utils/webdav";
+import { RequestReturn, WebDav, WebDavResource } from "../utils/webdav";
 import { ServerConfig } from "../models/Server";
 import { Dialog } from "../utils/dialog";
 import { Config } from "../models/Config";
+import { Global } from "../models/Global";
+import { ConfigGlobalStatus } from "../typing";
 
 @ComponentV2
 export struct FolderSelectDialog {
@@ -13,7 +15,8 @@ export struct FolderSelectDialog {
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
   @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
-  @Local safeArea: SafeArea = AppStorageV2.connect(SafeArea, () => new SafeArea(0, 0))!;
+  @Local safeArea: SafeArea = AppStorageV2.connect(SafeArea, () => SafeArea.getInstance())!;
+  @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local dirList: WebDavResource[] = [];
   @Local path: string[] = []
   @Local init: boolean = true;
@@ -44,7 +47,7 @@ export struct FolderSelectDialog {
   }
 
   changeDir(href: string) {
-    IBestToast.showLoading()
+    // IBestToast.showLoading()
     let path = href.split('/');
     console.log(JSON.stringify(path));
     if (path[path.length - 1] === '') {
@@ -56,9 +59,9 @@ export struct FolderSelectDialog {
     this.webdav.getDirs(href).then((rr) => {
       // console.log(JSON.stringify(rr))
       this.dirList = rr.data ? rr.data : [];
-      IBestToast.hide();
+      // IBestToast.hide();
     }).catch(() => {
-      IBestToast.hide();
+      // IBestToast.hide();
     })
 
   }
@@ -100,6 +103,7 @@ export struct FolderSelectDialog {
           ],
           onCancel: () => {
             if (this.path.length <= 1) {
+              console.log(`path length <= 1, ${this.path.join('/')}`)
               Dialog.closeDialog();
               return true;
             } else {
@@ -118,16 +122,28 @@ export struct FolderSelectDialog {
             this.config.update().then(() => {
               // 在服务器上创建目录
               try {
-                this.webdav.mkDir(path).then(() => {})
+                this.webdav.mkDir(path).then((rr: RequestReturn) => {
+                  if (rr.success) {
+                    this.global.configGlobalStatus = ConfigGlobalStatus.YES;
+                    Dialog.closeDialog();
+                  } else {
+                    console.warn(JSON.stringify(rr));
+                    IBestNotify.show({
+                      message: rr.message,
+                      duration: 3000,
+                      type: 'warning'
+                    });
+                  }
+
+                })
               } catch (error) {
                 const err = error as BusinessError;
                 IBestNotify.show({
                   message: err.message,
                   duration: 3000,
                   type: 'warning'
-                })
+                });
               }
-              Dialog.closeDialog();
             })
           }
         })
