@@ -4,7 +4,7 @@
       "name": "backupWidget",
       "displayName": "$string:backupWidget_display_name",
       "description": "$string:backupWidget_desc",
-      "src": "./ets/backupwidget/pages/BackupWidgetCard.ets",
+      "src": "./ets/formwidget/pages/FormWidgetCard.ets",
       "uiSyntax": "arkts",
       "window": {
         "designWidth": 720,

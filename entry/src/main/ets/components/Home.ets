@@ -8,6 +8,7 @@ import { WaitList } from "./WaitList";
 import { SucList } from "./SucList";
 import { Global } from "../models/Global";
 import { emitter } from "@kit.BasicServicesKit";
+import { TaskUpload } from "../utils/taskUpload";
 
 
 @ComponentV2
@@ -83,7 +84,7 @@ export struct Home {
       this.global.tabIndex = index;
       console.log(`tab切换到${index}`)
       if (index === 0) {
-        emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
+        (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
       }
     })
   }

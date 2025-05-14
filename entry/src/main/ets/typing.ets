@@ -1,6 +1,7 @@
 import { TaskItem } from "./models/TaskItem";
 import { UploadItemSendable } from "./models/UploadItemSendable";
 
+export enum FormStatus {DEFAULT=0, COLLECT=1, EXEC=2};
 export enum LoginStatus { INIT = "init", NO_SERVER = "no_server", NO_LOGIN = "no_login", LOGIN = "login" }
 export enum TaskDoing {NO = "no", YES = "yes"}
 export enum ConfigGlobalStatus {NO = 0, YES = 1}

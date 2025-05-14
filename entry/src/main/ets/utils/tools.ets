@@ -3,6 +3,9 @@ import { util } from '@kit.ArkTS';
 import { connection } from '@kit.NetworkKit';
 import { batteryInfo, BusinessError } from '@kit.BasicServicesKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
+import { LowBatteryStop, OnlyWIFIBackup } from '../typing';
+import { IBestNotify } from '@ibestservices/ibest-ui-v2';
+import { Config } from '../models/Config';
 
 export async function copyPhoto(uri: string, size: number, destFilePath: string) {
   let destPath: fileIo.File;
@@ -222,4 +225,33 @@ export async function calculateFileHash(fileStream: fileIo.Stream, size: number)
 
 export function strip(str: string, trip: string) {
   return str.endsWith(trip) ? str.slice(0, -1) : str;
+}
+
+export function checkBattery(config: Config) {
+  if (config.lowBatteryStop === LowBatteryStop.YES) {
+    if (getBatteryLevel() <= 15) {
+      IBestNotify.show({
+        message: "已打开低电量不备份，当前电量低于15%，不启动备份任务",
+        type: "warning",
+        duration: 3000
+      })
+      return false;
+    }
+  }
+  return true;
+}
+
+export async function checkWifi(config: Config) {
+  if (config.onlyWifi === OnlyWIFIBackup.YES) {
+    const netType = await getCurrentNetType();
+    if (netType == connection.NetBearType.BEARER_CELLULAR) {
+      IBestNotify.show({
+        message: "已打开仅wifi备份，当前使用移动网络，不启动备份任务",
+        type: "warning",
+        duration: 3000
+      })
+      return false;
+    }
+  }
+  return true;
 }

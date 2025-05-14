@@ -39,20 +39,20 @@
         ]
       }
     ],
-    "extensionAbilities": [
-      {
-        "name": "EntryBackupAbility",
-        "srcEntry": "./ets/entryformability/EntryFormAbility.ets",
-        "type": "form",
-        "exported": false,
-        "metadata": [
-          {
-            "name": "ohos.extension.form",
-            "resource": "$profile:form_config"
-          }
-        ]
-      }
-    ],
+//    "extensionAbilities": [
+//      {
+//        "name": "EntryBackupAbility",
+//        "srcEntry": "./ets/entryformability/EntryFormAbility.ets",
+//        "type": "form",
+//        "exported": false,
+//        "metadata": [
+//          {
+//            "name": "ohos.extension.form",
+//            "resource": "$profile:form_config"
+//          }
+//        ]
+//      }
+//    ],
     "requestPermissions": [
       {
         "name": "ohos.permission.INTERNET",

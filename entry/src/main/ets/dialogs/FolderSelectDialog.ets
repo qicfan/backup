@@ -1,7 +1,8 @@
 import { IBestDialog, IBestLoading, IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
 import { BusinessError, deviceInfo } from "@kit.BasicServicesKit"
 import { SafeArea } from "../utils/safeArea";
-import { AppStorageV2, EditableLeftIconType, EditableTitleBar } from "@kit.ArkUI";
+import { AppStorageV2, EditableLeftIconType, EditableTitleBar, EditableTitleBarItem,
+  EditableTitleBarMenuItem } from "@kit.ArkUI";
 import { RequestReturn, WebDav, WebDavResource } from "../utils/webdav";
 import { ServerConfig } from "../models/Server";
 import { Dialog } from "../utils/dialog";
@@ -23,11 +24,8 @@ export struct FolderSelectDialog {
   private deviceName = deviceInfo.marketName;
 
   aboutToAppear() {
-    // console.log("folder select dialog open")
     let path = this.rootPath;
-    console.log(path);
     path = path.replace('/' + this.deviceName + '/', '')
-    console.log(path);
     // 如果为空则设置为/
     if (path === "") {
       this.path = ['/']
@@ -37,7 +35,6 @@ export struct FolderSelectDialog {
     if (this.path.length >=2 && this.path[0] == "" && this.path[1] == "") {
       this.path.shift();
     }
-    console.log(JSON.stringify(this.path));
     this.webdav.getDirs(this.path.join('/')).then((rr) => {
       this.dirList = rr.data ? rr.data : [];
       this.init = false;
@@ -47,21 +44,14 @@ export struct FolderSelectDialog {
   }
 
   changeDir(href: string) {
-    // IBestToast.showLoading()
     let path = href.split('/');
-    console.log(JSON.stringify(path));
     if (path[path.length - 1] === '') {
       path.pop()
     }
-    console.log(JSON.stringify(path));
     this.path = path;
-    console.log(JSON.stringify(this.path));
     this.webdav.getDirs(href).then((rr) => {
-      // console.log(JSON.stringify(rr))
       this.dirList = rr.data ? rr.data : [];
-      // IBestToast.hide();
     }).catch(() => {
-      // IBestToast.hide();
     })
 
   }
@@ -86,66 +76,63 @@ export struct FolderSelectDialog {
     }.padding(20)
   }
 
+  menu: EditableTitleBarMenuItem = {
+    value: $r('sys.media.ohos_ic_public_add'), isEnabled: true, action: () => {this.newDirDialog = true;}
+  }
+
+  onCancel() {
+    if (this.path.length <= 1) {
+      Dialog.closeDialog();
+      return true;
+    } else {
+      this.path.pop()
+      this.changeDir(this.path.join('/'))
+      return false;
+    }
+  }
+
+  onSave() {
+    let path = this.path.join('/')
+    if (!path.endsWith('/')) {
+      path += '/';
+    }
+    path += this.deviceName + '/';
+    this.config.backupRootPath = path;
+    this.config.update().then(() => {
+      // 在服务器上创建目录
+      try {
+        this.webdav.mkDir(path).then((rr: RequestReturn) => {
+          if (rr.success) {
+            this.global.configGlobalStatus = ConfigGlobalStatus.YES;
+            Dialog.closeDialog();
+          } else {
+            IBestNotify.show({
+              message: rr.message,
+              duration: 3000,
+              type: 'warning'
+            });
+          }
+        })
+      } catch (error) {
+        const err = error as BusinessError;
+        IBestNotify.show({
+          message: err.message,
+          duration: 3000,
+          type: 'warning'
+        });
+      }
+    })
+  }
+
   build() {
     Column() {
       Column() {
         EditableTitleBar({
           leftIconStyle: EditableLeftIconType.Back,
           title: '选择保存路径',
-          menuItems: [
-            {
-              value: $r('sys.media.ohos_ic_public_add'),
-              isEnabled: true,
-              action: () => {
-                this.newDirDialog = true;
-              }
-            }
-          ],
-          onCancel: () => {
-            if (this.path.length <= 1) {
-              console.log(`path length <= 1, ${this.path.join('/')}`)
-              Dialog.closeDialog();
-              return true;
-            } else {
-              this.path.pop()
-              this.changeDir(this.path.join('/'))
-              return false;
-            }
-          },
-          onSave: () => {
-            let path = this.path.join('/')
-            if (!path.endsWith('/')) {
-              path += '/';
-            }
-            path += this.deviceName + '/';
-            this.config.backupRootPath = path;
-            this.config.update().then(() => {
-              // 在服务器上创建目录
-              try {
-                this.webdav.mkDir(path).then((rr: RequestReturn) => {
-                  if (rr.success) {
-                    this.global.configGlobalStatus = ConfigGlobalStatus.YES;
-                    Dialog.closeDialog();
-                  } else {
-                    console.warn(JSON.stringify(rr));
-                    IBestNotify.show({
-                      message: rr.message,
-                      duration: 3000,
-                      type: 'warning'
-                    });
-                  }
-
-                })
-              } catch (error) {
-                const err = error as BusinessError;
-                IBestNotify.show({
-                  message: err.message,
-                  duration: 3000,
-                  type: 'warning'
-                });
-              }
-            })
-          }
+          menuItems: [this.menu],
+          onCancel: () => {this.onCancel()},
+          onSave: () => {this.onSave()}
         })
       }
       Column() {
@@ -229,7 +216,6 @@ export struct FolderSelectDialog {
           let path = this.path.join('/') + '/' + this.newDirName + '/'
           try {
             this.webdav.mkDir(path).then((rs) => {
-              console.log(JSON.stringify(rs))
               if (rs.success) {
                 IBestNotify.show({
                   message: "已切换到新建的目录",

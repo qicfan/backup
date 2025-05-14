@@ -5,41 +5,53 @@ import { IBestInit } from "@ibestservices/ibest-ui-v2";
 import { DB } from '../models/DB';
 import { SafeArea } from '../utils/safeArea';
 import { rpc } from '@kit.IPCKit';
-import { BusinessError } from '@kit.BasicServicesKit';
+import { BusinessError, emitter } from '@kit.BasicServicesKit';
 import { BreakpointConstants } from '../common/BreakpointConstants';
 import { WinBreakpoint } from '../common/WinBreakpoint';
 import { WindowUtil } from '../utils/windowUtil';
+import { ConfigGlobalStatus, FormStatus, LoginStatus } from '../typing';
+import { formBindingData, formProvider } from '@kit.FormKit';
+import { TaskUpload } from '../utils/taskUpload';
+import { TaskItem } from '../models/TaskItem';
+import { Global } from '../models/Global';
+import { BackGroundUtil } from '../utils/BackgroundUtil';
+import { ServerConfig } from '../models/Server';
+import { Config } from '../models/Config';
 
 const DOMAIN = 0x0000;
 const TAG: string = 'WidgetEventCallEntryAbility';
 const DOMAIN_NUMBER: number = 0xFF00;
-const CONST_NUMBER_1: number = 1;
 
 // rpc通信返回类型的实现，用于rpc通信数据序列化和反序列化
 class MyParcelable implements rpc.Parcelable {
-  num: number;
-  str: string;
+  status: FormStatus;
+  preTotal: number;
+  total: number;
 
-  constructor(num: number, str: string) {
-    this.num = num;
-    this.str = str;
+  constructor(status: FormStatus, preTotal: number, total: number) {
+    this.status = status;
+    this.preTotal = preTotal;
+    this.total = total;
   }
 
   marshalling(messageSequence: rpc.MessageSequence): boolean {
-    messageSequence.writeInt(this.num);
-    messageSequence.writeString(this.str);
+    messageSequence.writeInt(this.status);
+    messageSequence.writeInt(this.preTotal);
+    messageSequence.writeInt(this.total);
     return true;
   }
 
   unmarshalling(messageSequence: rpc.MessageSequence): boolean {
-    this.num = messageSequence.readInt();
-    this.str = messageSequence.readString();
+    this.status = messageSequence.readInt();
+    this.preTotal = messageSequence.readInt();
+    this.total = messageSequence.readInt();
     return true;
   }
 }
 
 export default class EntryAbility extends UIAbility {
   private windowObj?: window.Window;
+  private formId: string = "";
 
   private updateHeightBp(): void {
     if (this.windowObj === undefined) {
@@ -91,33 +103,116 @@ export default class EntryAbility extends UIAbility {
     winBP!.updateImageSize();
   }
 
+  notifyFormCollect() {
+    let obj: Record<string, string | number> = {
+      'formId': this.formId,
+      'status': FormStatus.COLLECT,
+      'preTotal': 0,
+      'total': 0
+    };
+    let formData: formBindingData.FormBindingData = formBindingData.createFormBindingData(obj);
+    formProvider.updateForm(this.formId, formData);
+  }
+  notifyFormDefault() {
+    let obj: Record<string, string | number> = {
+      'formId': this.formId,
+      'status': FormStatus.DEFAULT,
+      'preTotal': 0,
+      'total': 0
+    };
+    let formData: formBindingData.FormBindingData = formBindingData.createFormBindingData(obj);
+    formProvider.updateForm(this.formId, formData);
+  }
+  notifyFormUploadProgress(preTotal: number, total: number) {
+    let obj: Record<string, string | number> = {
+      'formId': this.formId,
+      'status': FormStatus.COLLECT,
+      'preTotal': preTotal,
+      'total': total
+    };
+    let formData: formBindingData.FormBindingData = formBindingData.createFormBindingData(obj);
+    formProvider.updateForm(this.formId, formData);
+  }
+
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
-    // checkPermissions(this.context, 'ohos.permission.READ_IMAGEVIDEO'); // 申请权限
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
+    hilog.info(DOMAIN_NUMBER, TAG, `want:  ${JSON.stringify(want)}`);
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance());
-    try {
-      // 监听call事件所需的方法并调用
-      this.callee.on('backup', (data: rpc.MessageSequence) => {
-        // 获取call事件中传递的所有参数
-        hilog.info(DOMAIN_NUMBER, TAG, `backup param:  ${JSON.stringify(data.readString())}`);
-        return new MyParcelable(CONST_NUMBER_1, 'aaa');
-      });
-    } catch (err) {
-      hilog.error(DOMAIN_NUMBER, TAG, `Failed to register callee on. Cause: ${JSON.stringify(err as BusinessError)}`);
-    }
+    // try {
+    //   if (want.parameters === undefined) {
+    //     return ;
+    //   }
+    //   this.formId = want.parameters.formID + '';
+    //   // 监听call事件所需的方法并调用
+    //   this.callee.on('backup', () => {
+    //     hilog.info(DOMAIN_NUMBER, TAG, `卡片执行备份事件，卡片ID:  ${this.formId}`);
+    //     const global = Global.getInstance();
+    //     const taskUpload = TaskUpload.getInstance();
+    //     DB.init(this.context).then(() => {
+    //       try {
+    //         ServerConfig.getInstance().queryAsset().then((serverRs: boolean) => {
+    //           if (!serverRs) return ;
+    //           global.loginStatus = LoginStatus.LOGIN;
+    //           Config.getInstance().init().then((configRs: number) => {
+    //             if (configRs !== 1) return;
+    //             global.configGlobalStatus = ConfigGlobalStatus.YES;
+    //             // 1. 检索新项目
+    //             taskUpload.startCreateTask(this.context).then((exists) => {
+    //               hilog.info(DOMAIN_NUMBER, TAG, `是否存在新项目：${exists}`)
+    //               this.notifyFormCollect();
+    //               // 查询总数
+    //               global.preTotal = TaskItem.getWaitCount();
+    //               // 2. 触发上传
+    //               taskUpload.start().then(() => {
+    //                 const total: number = TaskItem.getWaitCount();
+    //                 this.notifyFormUploadProgress(global.preTotal, total);
+    //                 BackGroundUtil.getInstance().startBackground().then(() => {
+    //                   hilog.info(DOMAIN_NUMBER, TAG, `已启动后台任务`)
+    //                 })
+    //               }).catch((err: BusinessError) => {
+    //                 hilog.error(DOMAIN_NUMBER, TAG, `执行任务失败. Cause: ${JSON.stringify(err as BusinessError)}`);
+    //               })
+    //               // 3. 监听上传事件，通知卡片刷新
+    //               // 上传完成的消息，检测任务是否已经完成
+    //               emitter.on(Global.BACKUP_UPLOAD_WORKER_IDLE, async () => {
+    //                 const total: number = TaskItem.getWaitCount();
+    //                 this.notifyFormUploadProgress(global.preTotal, total);
+    //               })
+    //               emitter.on(Global.BACKUP_TASK_FINISH, () => {
+    //                 this.notifyFormDefault();
+    //               })
+    //             }).catch((err: BusinessError) => {
+    //               hilog.error(DOMAIN_NUMBER, TAG, `执行任务失败. Cause: ${JSON.stringify(err as BusinessError)}`);
+    //             })
+    //           })
+    //         })
+    //
+    //       } catch (err) {
+    //         hilog.error(DOMAIN_NUMBER, TAG, `Failed to register callee on. Cause: ${JSON.stringify(err as BusinessError)}`);
+    //         this.notifyFormDefault();
+    //       }
+    //     });
+    //     return new MyParcelable(FormStatus.DEFAULT, 0, 0);
+    //   });
+    // } catch (err) {
+    //   hilog.error(DOMAIN_NUMBER, TAG, `Failed to register callee on. Cause: ${JSON.stringify(err as BusinessError)}`);
+    //   this.notifyFormDefault();
+    // }
   }
 
   onDestroy(): void {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
     try {
       this.callee.off('backup');
+      this.notifyFormDefault();
     } catch (err) {
       hilog.error(DOMAIN_NUMBER, TAG, `Failed to register callee off. Cause: ${JSON.stringify(err as BusinessError)}`);
     }
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
+    console.log('载入UI：' + this.formId);
     // Main window is created, set main page for this ability
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
     windowStage.getMainWindow().then((data: window.Window) => {
@@ -171,15 +266,11 @@ export default class EntryAbility extends UIAbility {
   onWindowStageDestroy(): void {
     // Main window is destroyed, release UI related resources
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
-    try {
-      this.callee.off('funA');
-    } catch (err) {
-      hilog.error(DOMAIN_NUMBER, TAG, `Failed to register callee off. Cause: ${JSON.stringify(err as BusinessError)}`);
-    }
   }
 
   onForeground(): void {
     // Ability has brought to foreground
+    console.log('app拉到前台：' + this.formId);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
   }
 

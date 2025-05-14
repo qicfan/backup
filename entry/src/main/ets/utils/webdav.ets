@@ -91,6 +91,10 @@ export class WebDav {
         requestReturn.message = "权限不足"
         requestReturn.success = false;
       }
+      if (resp.statusCode === 405) {
+        requestReturn.message = "已存在"
+        requestReturn.success = false;
+      }
 
       if (resp.statusCode === 500) {
         requestReturn.message = "服务器内部错误，请检查服务器是否正常。"
@@ -126,7 +130,7 @@ export class WebDav {
 
   // 验证服务器和验证方式是否可用
   public async valid() {
-    const req = new rcp.Request('/', "PROPFIND", { "Depth": "1" });
+    const req = new rcp.Request('/', "PROPFIND", { "Depth": "0" });
     return await this.request(req);
   }
 
@@ -159,7 +163,7 @@ export class WebDav {
   // 是否存在
   async exists(path: string, size: number) {
     console.log(`查询${path}是否存在`)
-    const req = new rcp.Request(path, "HEAD");
+    const req = new rcp.Request(path, "PROPFIND", { "Depth": "0" });
     const rr = await this.request(req);
     // 不存在
     if (!rr.success) {
@@ -183,10 +187,28 @@ export class WebDav {
     }
   }
 
+  async pathExists(path: string) {
+    console.log(`查询${path}是否存在`)
+    const req = new rcp.Request(path, "PROPFIND", { "Depth": "0" });
+    const rr = await this.request(req);
+    console.warn(JSON.stringify(rr));
+    console.log(`${path} => ${rr.success}`)
+    if (rr.success) return true;
+    return false;
+  }
   // 创建目录
   async mkDir(path: string) {
     if (!path.endsWith('/')) {
       path = path + '/';
+    }
+    // 查询是否存在
+    const exists = await this.pathExists(path);
+    if (exists) {
+      const requestReturn: RequestReturn = new RequestReturn();
+      requestReturn.success = true;
+      requestReturn.statusCode = 200
+      requestReturn.message = "";
+      return requestReturn;
     }
     const req = new rcp.Request(path, "MKCOL");
     return await this.request(req);

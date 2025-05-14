@@ -1,13 +1,10 @@
 import { CommonConstants } from "../common/CommonConstants";
 import { TaskItem } from "../models/TaskItem"
-import { TaskBottom } from "./TaskBottom";
 import { TaskItemComponent } from "./TaskItemComponent";
 import { IBestEmpty } from "@ibestservices/ibest-ui-v2";
-import { TaskCheck } from "./TaskCheck";
-import { TaskItemDataSource } from "../models/TaskItemDataSource";
+import { SucTaskItemDataSource } from "../models/TaskItemDataSource";
 import { WinBreakpoint } from "../common/WinBreakpoint";
 import { AppStorageV2 } from "@kit.ArkUI";
-import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 
 @ComponentV2
@@ -18,7 +15,7 @@ export struct SucList {
   @Local winBP: WinBreakpoint =
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
-  @Provider("taskItemDataSource") data: TaskItemDataSource = new TaskItemDataSource();
+  @Provider("taskItemDataSource") data: SucTaskItemDataSource = new SucTaskItemDataSource();
 
   private scroller: Scroller = new Scroller();
   page: number = 1;
@@ -99,7 +96,7 @@ export struct SucList {
           })
         } else {
           IBestEmpty({
-            description: "没有需要备份的照片或视频"
+            description: "还没有已备份的照片或视频"
           })
         }
       }

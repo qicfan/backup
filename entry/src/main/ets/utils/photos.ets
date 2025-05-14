@@ -46,7 +46,7 @@ export class Photos {
         item.photoType = ps.photoType as number;
         item.subType = ps.get('subtype') as number;
         item.name = ps.displayName;
-        item.dateModified = ps.get('date_modified') as number;
+        item.createdAt = ps.get('date_modified') as number;
         item.size = ps.get('size') as number;
         item.status = TaskItemStatus.WAIT;
         item.makeUri(ctx);

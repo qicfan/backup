@@ -5,6 +5,18 @@
       "value": "#000000"
     },
     {
+      "name": "ibest_white",
+      "value": "#000000"
+    },
+    {
+      "name": "tab_background_color",
+      "value": "#4d4d4d"
+    },
+    {
+      "name": "tab_sel_color",
+      "value": "#ED6F21"
+    },
+    {
       "name": "ibest_text_color",
       "value": "#f5f5f5"
     },

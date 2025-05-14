@@ -1,10 +1,12 @@
 import { ErrorEvent, MessageEvents, worker } from "@kit.ArkTS";
 import { UploadItemSendable } from "../models/UploadItemSendable";
 import { emitter } from "@kit.BasicServicesKit";
-import { CopyWorkerMessage, TaskItemStatus, WorkerMessage } from "../typing";
+import { CopyWorkerMessage, TaskItemStatus, UploadQueueItem, WorkerMessage } from "../typing";
 import { TaskItem } from "../models/TaskItem";
 import { Global } from "../models/Global";
 import { CopyItemSendable } from "../models/CopyItemSendable";
+import { TaskItemQueue } from "../common/TaskItemQueue";
+import { WebDav } from "./webdav";
 
 // 上传工作线程
 export class UploadWorkerItem {
@@ -12,6 +14,7 @@ export class UploadWorkerItem {
   workerInstance: worker.ThreadWorker | undefined = undefined; // 工作线程实例
   uploadItem: UploadItemSendable | undefined = undefined; // 待上传对象
   taskItem: TaskItem | undefined = undefined;
+  taskItemQueue: TaskItemQueue = TaskItemQueue.getInstance();
 
   init(workerInstance: worker.ThreadWorker) {
     this.workerInstance = workerInstance;
@@ -41,24 +44,16 @@ export class UploadWorkerItem {
           await taskItem.success()
           console.log(`文件${taskItem.id} 已完成，状态: ${taskItem.status}, 已上传：${taskItem.uploadedSize}`)
           emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {data: {id: taskItem.id}});
-          // 通知主线程有任务空闲
-          this.resetProp();
-          emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE);
-          return ;
         }
         if (data.action === "ERROR") {
           console.error(JSON.stringify(data));
           // 上传发生错误
           await taskItem.failed(data.message);
           emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {data: {id: taskItem.id}});
-          this.resetProp();
-          // 通知主线程有任务空闲
-          emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE)
-        } else {
-          this.resetProp();
-          // 通知主线程有任务空闲
-          emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE)
         }
+        this.getNewAndExec();
+        // 通知主线程有任务空闲
+        emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE)
       })
     }
     // 在调用terminate后，执行回调onexit
@@ -76,6 +71,18 @@ export class UploadWorkerItem {
       // 通知主线程有任务空闲
       emitter.emit(Global.BACKUP_UPLOAD_WORKER_IDLE)
     }
+  }
+
+  getNewAndExec() {
+    const item: UploadQueueItem = this.taskItemQueue.uploadItemQueue.pop();
+    if (!item) {
+      // 队列已空
+      console.info(`上传队列已空`);
+      this.resetProp();
+      // 触发检查任务是否已完成
+      return ;
+    }
+    this.execute(item.uploadItem, item.taskItem);
   }
 
   async execute(uploadItem: UploadItemSendable, taskItem: TaskItem) {
@@ -104,6 +111,8 @@ export class CopyImageWorkItem {
   isIdle: boolean = true; // 是否空闲
   workerInstance: worker.ThreadWorker | undefined = undefined; // 工作线程实例
   taskItem: TaskItem | undefined = undefined;
+  taskItemQueue: TaskItemQueue = TaskItemQueue.getInstance();
+  webdav: WebDav = WebDav.getInstance();
 
   init(workerInstance: worker.ThreadWorker) {
     this.workerInstance = workerInstance;
@@ -117,17 +126,19 @@ export class CopyImageWorkItem {
         taskItem.id = taskItemId;
         taskItem.fetch().then(() => {
           // 更新文件大小
-          if (copyWorkMsg.imageSize != taskItem.size || copyWorkMsg.videoSize != this.taskItem?.videoSize) {
+          if (copyWorkMsg.imageSize != taskItem.size || copyWorkMsg.videoSize != taskItem.videoSize) {
             console.log(`更新文件大小${taskItem.id} => size: ${copyWorkMsg.imageSize}, videoSize: ${copyWorkMsg.videoSize}`)
             taskItem.updateSize(copyWorkMsg.imageSize, copyWorkMsg.videoSize).then(() => {
-              this.resetProp();
-              emitter.emit(Global.BACKUP_COPY_FINISH, {data: {taskItemId: copyWorkMsg.taskItemId}})
-              emitter.emit(Global.BACKUP_COPY_WORKER_IDLE)
+              this.addFinishItemToUpload(taskItem)
+              this.getNewAndExec();
+              // 触发上传队列执行
+              emitter.emit(Global.BACKUP_COPY_FINISH, {data: {taskItemId: copyWorkMsg.taskItemId}});
             })
           } else {
-            this.resetProp();
-            emitter.emit(Global.BACKUP_COPY_FINISH, {data: {taskItemId: copyWorkMsg.taskItemId}});
-            emitter.emit(Global.BACKUP_COPY_WORKER_IDLE)
+            this.addFinishItemToUpload(taskItem);
+            this.getNewAndExec();
+            // 触发上传队列执行
+            emitter.emit(Global.BACKUP_COPY_FINISH, {data: {taskItemId: copyWorkMsg.taskItemId}})
           }
         })
       }
@@ -143,6 +154,24 @@ export class CopyImageWorkItem {
     workerInstance.onerror = (err: ErrorEvent) => {
       console.log("main error message " + err.message);
     }
+  }
+
+  getNewAndExec() {
+    const newTaskItem = this.taskItemQueue.copyImageQueue.pop();
+    if (!newTaskItem) {
+      // 队列已空
+      console.info(`文件复制队列已空`);
+      this.resetProp();
+      return ;
+    }
+    this.execute(newTaskItem);
+  }
+
+  addFinishItemToUpload(taskItem: TaskItem) {
+    const auth = this.webdav.getBase64Auth();
+    const uploadItem = new UploadItemSendable(getContext(), taskItem, auth);
+    // 加入上传队列
+    const rs = this.taskItemQueue.uploadItemQueue.add({uploadItem: uploadItem, taskItem: taskItem});
   }
 
   async execute(taskItem: TaskItem) {

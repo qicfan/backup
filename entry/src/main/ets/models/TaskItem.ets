@@ -234,11 +234,13 @@ export class TaskItem {
     let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
     predicates.orderByDesc('id').limitAs(1)
     const rs = await DB.getInstance().store?.query(predicates)
+    console.log(`查询最后一条文件记录，返回数: ${rs?.rowCount}`)
     if (rs !== undefined && rs.rowCount > 0) {
       rs.goToNextRow()
       lastTimestamp = rs.getLong(rs.getColumnIndex('created_at'))
+      console.log(`查询到的最后一次的时间1：${lastTimestamp}`)
     }
-    console.log(`查询到的最后一次的时间：${lastTimestamp}`)
+    console.log(`查询到的最后一次的时间2：${lastTimestamp}`)
     rs?.close();
     let page = 1;
     const pageSize = 100;
@@ -445,28 +447,6 @@ export class TaskItem {
     }
   }
 
-  // async mkRemotePath(): Promise<boolean> {
-  //   const config = Config.getInstance();
-  //   const webdav = WebDav.getInstance();
-  //   const dirList: string[] = this.remoteUri.split('/').filter(part => part.length > 0);
-  //   dirList.pop();
-  //   let currentPath: string = strip(config.backupRootPath, '/');
-  //   for (let dir of dirList) {
-  //     // 创建目录
-  //     currentPath += `/${dir}`;
-  //     const rr = await webdav.mkDir(currentPath);
-  //     if ((rr.statusCode >= 200 && rr.statusCode < 300) || rr.statusCode == 405) {
-  //       continue
-  //     } else {
-  //       await this.failed("在服务器上创建目录" + currentPath + "失败");
-  //       // 创建目录失败
-  //       console.log(`创建目录失败：${currentPath}`);
-  //       return false;
-  //     }
-  //   }
-  //   return true;
-  // }
-
   getFullRemoteUri(remoteUri: string, hasBaseUri: boolean = false) {
     const server = ServerConfig.getInstance();
     const config = Config.getInstance();
@@ -478,79 +458,4 @@ export class TaskItem {
     url += `${rootPath}/${remoteUri}`;
     return url;
   }
-
-  // 上传该图片
-  // async upload(ctx: Context): Promise<boolean> {
-  //   await this.start();
-  //   if (!(await this.mkRemotePath())) {
-  //     return false;
-  //   }
-  //   let type = "default"
-  //   const remoteUri = this.getFullRemoteUri(this.remoteUri)
-  //   let remoteVideoUri: string = "";
-  //   let existsRR: number = await this.webdav.exists(remoteUri, this.size);
-  //   let existsVideoRR: number = 0;
-  //   // 如果时动态图，则获取图片和视频分别上传
-  //   if (this.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
-  //     type = "video";
-  //     remoteVideoUri = this.getFullRemoteUri(this.remoteVideoUri)
-  //     existsVideoRR = await this.webdav.exists(remoteVideoUri, this.videoSize);
-  //   }
-  //   if (existsRR === 2) {
-  //     console.log(`${remoteUri}在服务器上存在，但是大小和本地不同，删除服务端文件。`)
-  //     // 存在，不一致，删除远程文件
-  //     await this.webdav.delete(remoteUri)
-  //     existsRR = 0;
-  //   }
-  //   if (existsRR === 0) {
-  //     // 不存在,先复制文件
-  //     try {
-  //       console.log(`先复制要上传的文件${this.uri} => ${this.fileUri}`)
-  //       // await copyPhoto(this.uri, this.size, this.fileUri);
-  //       await copyImg2Sandbox(this.uri, this.fileUri, this.size);
-  //     } catch (e) {
-  //       console.log(`复制文件失败, code:${e.code}. msg:${e.message}`)
-  //       this.failed(e.message)
-  //       return false;
-  //     }
-  //     // 上传图片文件
-  //     console.log(`开始上传文件${remoteUri}，大小:${this.size}`)
-  //     if (Global.PAUSE) return false;
-  //     const rs = await this.webdav.uploadTaskItem(ctx, this);
-  //     if (rs != "success") {
-  //       console.log(`${remoteUri}上传失败`)
-  //       await this.failed(rs);
-  //       return false;
-  //     }
-  //     existsRR = 1;
-  //   }
-  //   if (existsRR === 1) {
-  //     await this.updateUploadedSize(this.size)
-  //     await this.task.updateUploadedSize(this.size)
-  //   }
-  //   if (type === 'video') {
-  //     if (existsVideoRR === 2) {
-  //       console.log(`动态图视频${remoteVideoUri}在服务器上存在，但是大小和本地不同，删除服务端文件。}`)
-  //       await this.webdav.delete(remoteVideoUri);
-  //       existsRR = 0;
-  //     }
-  //     if (existsVideoRR === 0) {
-  //       console.log(`开始上传文件${remoteVideoUri}，大小:${this.videoSize}`)
-  //       let b = await this.webdav.uploadTaskItem(ctx, this, 'video');
-  //       if (b !== 'success') {
-  //         console.log(`动态图视频${remoteVideoUri}上传失败`);
-  //         // 失败了
-  //         await this.failed(b);
-  //         return false;
-  //       }
-  //       existsVideoRR = 1;
-  //     }
-  //     if (existsVideoRR === 1) {
-  //       await this.updateUploadedSize(this.videoSize)
-  //       await this.task.updateUploadedSize(this.videoSize)
-  //     }
-  //   }
-  //   await this.success();
-  //   return true;
-  // }
 }

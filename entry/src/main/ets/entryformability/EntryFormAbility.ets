@@ -14,11 +14,14 @@ export default class EntryBackupAbility extends FormExtensionAbility  {
       return formBindingData.createFormBindingData('');
     }
 
-    let formName: string = want.parameters[formInfo.FormParam.NAME_KEY] as string;
     let formId: string = want.parameters[formInfo.FormParam.IDENTITY_KEY] as string;
-    let storage: LocalStorage = new LocalStorage();
-    storage.setOrCreate('formId', formId);
-    let formData = new FormData(formId);
+    let obj: Record<string, string|number> = {
+      'formId': formId,
+      'status': 'titleOnUpdateForm',
+      'preTotal': 0,
+      'total': 0
+    };
+    let formData: formBindingData.FormBindingData = formBindingData.createFormBindingData(obj);
     return formBindingData.createFormBindingData(formData);
   }
 
@@ -34,9 +37,10 @@ export default class EntryBackupAbility extends FormExtensionAbility  {
   onUpdateForm(formId: string): void {
     // 若卡片支持定时更新/定点更新/卡片使用方主动请求更新功能，则提供方需要重写该方法以支持数据更新
     hilog.info(DOMAIN_NUMBER, TAG, '[EntryFormAbility] onUpdateForm');
-    let obj: Record<string, string> = {
-      'title': 'titleOnUpdateForm',
-      'detail': 'detailOnUpdateForm'
+    let obj: Record<string, string|number> = {
+      'status': 'titleOnUpdateForm',
+      'preTotal': 0,
+      'total': 0
     };
     let formData: formBindingData.FormBindingData = formBindingData.createFormBindingData(obj);
     formProvider.updateForm(formId, formData).catch((error: BusinessError) => {

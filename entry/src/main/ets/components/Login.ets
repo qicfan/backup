@@ -122,7 +122,7 @@ export struct Login {
     .title("添加WebDav服务器")
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.ibest_white'))
+    .backgroundColor($r('app.color.ibest_background'))
     .hideBackButton(this.pop)
     .onShown(() => {
       console.log('登录页面显示')

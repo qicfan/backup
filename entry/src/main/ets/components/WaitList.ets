@@ -4,11 +4,12 @@ import { TaskBottom } from "./TaskBottom";
 import { TaskItemComponent } from "./TaskItemComponent";
 import { IBestEmpty } from "@ibestservices/ibest-ui-v2";
 import { TaskCheck } from "./TaskCheck";
-import { TaskItemDataSource } from "../models/TaskItemDataSource";
+import { WaitTaskItemDataSource } from "../models/TaskItemDataSource";
 import { WinBreakpoint } from "../common/WinBreakpoint";
 import { AppStorageV2 } from "@kit.ArkUI";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
+import { TaskDoing } from "../typing";
 
 @ComponentV2
 export struct WaitList {
@@ -18,7 +19,7 @@ export struct WaitList {
   @Local winBP: WinBreakpoint =
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
-  @Provider("taskItemDataSource") data: TaskItemDataSource = new TaskItemDataSource();
+  @Provider("taskItemDataSource") data: WaitTaskItemDataSource = new WaitTaskItemDataSource();
 
   private scroller: Scroller = new Scroller();
   page: number = 1;
@@ -27,6 +28,10 @@ export struct WaitList {
     this.getList(1).then(() => {})
     emitter.on(Global.COLLECT_PHOTO_FINISH_EVENT, () => {
       // 如果有新项目则刷新页面
+      this.getList(1).then(() => {})
+    })
+    emitter.on(Global.BACKUP_TASK_FINISH, () => {
+      // 备份完成后刷新页面
       this.getList(1).then(() => {})
     })
   }
@@ -116,7 +121,7 @@ export struct WaitList {
       .onRefreshing(() => {
         this.onRefresh('pull')
       })
-      if (this.total > 0) {
+      if (this.total > 0 && this.global.taskGlobalStatus === TaskDoing.NO) {
         TaskBottom()
           .width('100%')
       } else {

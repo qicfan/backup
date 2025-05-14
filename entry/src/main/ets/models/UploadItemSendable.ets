@@ -3,7 +3,6 @@ import { Config } from "./Config";
 import { ServerConfig } from "./Server";
 import { TaskItem } from "./TaskItem";
 
-@Sendable
 export class UploadItemSendable {
   taskId: number = 0; // 任务ID
   taskItemId: number = 0; // 任务文件ID

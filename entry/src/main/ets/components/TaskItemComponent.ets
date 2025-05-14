@@ -7,11 +7,10 @@ import { IBestLoading } from "@ibestservices/ibest-ui-v2";
 import { IBestSkeletonParagraph } from "@ibestservices/ibest-ui-v2";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
-import { TaskItemDataSource } from "../models/TaskItemDataSource";
 
 @ComponentV2
 export struct TaskItemComponent {
-  @Consumer("taskItemDataSource") data: TaskItemDataSource = new TaskItemDataSource();
+  @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack();
   @Param taskItem: TaskItem | null = null;
   @Param index: number = 0;
   @Local isDelete: boolean = false;
@@ -53,7 +52,6 @@ export struct TaskItemComponent {
     this.updateIcon();
     if (this.taskItem.status !== TaskItemStatus.SUCCESS) {
       emitter.on(Global.UPDATE_TASK_ITEM_EVENT + '_' + this.taskItem.id, async () => {
-        console.log(`收到文件上传进度更新事件`)
         if (!this.taskItem) return;
         await this.taskItem.fetch();
         if (this.taskItem.status === TaskItemStatus.SUCCESS) {
@@ -63,8 +61,8 @@ export struct TaskItemComponent {
           this.progressY = 0;
         } else {
           // 失败了
-          this.progress = this.taskItem.uploadedSize / this.taskItem.size * 100;
-          this.progressY = 100 - this.progress
+          this.progress = 0;
+          this.progressY = 100;
         }
         this.updateIcon();
       })
@@ -88,15 +86,12 @@ export struct TaskItemComponent {
     this.imageStatusIcon = this.statusIcon[this.taskItem.status];
   }
 
-  aboutToDisappear(): void {
-    emitter.off(Global.UPDATE_TASK_ITEM_EVENT);
-  }
-
   build() {
     Stack() {
       if (!this.isDelete) {
         if (this.thumbnail) {
           Image(this.thumbnail).width(this.winBP.imageSize).height(this.winBP.imageSize).objectFit(ImageFit.Cover)
+            .geometryTransition(this.taskItem?.id + '')
         } else {
           IBestSkeletonParagraph({type: "image", rowWidth: this.winBP.imageSize, rowHeight: this.winBP.imageSize})
         }
@@ -128,6 +123,14 @@ export struct TaskItemComponent {
       .position({x: 2, y: 0})
     }
     .width(this.winBP.imageSize).height(this.winBP.imageSize)
+    .onClick(() => {
+      animateTo({
+        duration: 350,
+        curve: Curve.Friction
+      }, () => {
+        this.pageInfos.pushPathByName("taskItemDetail", this.taskItem?.id);
+      })
 
+    })
   }
 }

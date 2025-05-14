@@ -10,15 +10,14 @@ import {
 import { Config } from "../models/Config";
 import { Login } from "../components/Login";
 import { WebDav } from "../utils/webdav";
-import { BusinessError, emitter } from "@kit.BasicServicesKit";
-import { backgroundTaskManager } from "@kit.BackgroundTasksKit";
-import { notificationManager } from "@kit.NotificationKit";
 import { Privacy } from "../components/Privacy";
 import { TipDialog } from "../dialogs/TipDialog";
 import { Dialog } from "../utils/dialog";
 import { Agreement } from "../components/Agreement";
 import { Home } from "../components/Home";
-import { TaskItem } from "../models/TaskItem";
+import { TaskUpload } from "../utils/taskUpload";
+import { BackGroundUtil } from "../utils/BackgroundUtil";
+import { TaskItemDetail } from "../components/TaskItemDetail";
 
 @Builder
 function buildTip(event: ()=>void) {
@@ -32,21 +31,13 @@ struct Index {
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
   @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
-  private ctxUIAbility: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack()
   @Local creatingTask: boolean = false;
-
-  private notifyId: number = 0;
-  private jobId: number = 0;
-  private init: number = 0; // 0-未开始, 1-未设置服务器, 2-未完善色湖之，3-初始化成功
-
-  // 登录弹窗的节点
-  private tipDialogContentNode: ComponentContent<Object> =
-    new ComponentContent(this.getUIContext(), wrapBuilder(buildTip), () => {this.closeDialog()})
+  @Local init: number = 0;
 
   private openTipDialog() {
     Dialog.setContext(this.getUIContext());
-    Dialog.setContentNode(this.tipDialogContentNode);
+    Dialog.setContentNode(new ComponentContent(this.getUIContext(), wrapBuilder(buildTip), () => {this.closeDialog()}));
     Dialog.setOptions({
       alignment: DialogAlignment.BottomStart,
       isModal: true,
@@ -66,33 +57,23 @@ struct Index {
 
   aboutToAppear() {
     this.initApp().then(() => {});
-    // 暂停任务
-    emitter.on(Global.STOP_TASK_EVENT, () => {
-      console.log("收到暂停任务通知")
-      this.stopTaskEvent()
-    })
-  }
-
-  async aboutToDisappear() {
-    if (this.global.processId > 0) {
-      // 有正在运行的任务，结束任务
-      await this.stopTaskEvent()
-    }
   }
 
   onPageShow(): void {
     // 从后台转入前台时触发生成新任务
     console.log('进入首页')
     setTimeout(() => {
-      emitter.emit(Global.START_COLLECT_PHOTO_EVENT);
+      (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
     }, 3000);
-
   }
 
   onPageHide(): void {
     console.log('app切换到后台或者离开首页');
     if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask") && this.global.processId > 0) {
-      this.startBackground();
+      console.log(`index 触发 后台任务`);
+      (BackGroundUtil.getInstance()).startBackground();
+    } else {
+      console.log(`index 触发 后台任务失败, ${this.global.processId}, ${canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")}`);
     }
   }
 
@@ -169,96 +150,6 @@ struct Index {
     return true;
   }
 
-  // 停止任务
-  async stopTaskEvent() {
-    await this.stopTask();
-  }
-
-  // 停止任务
-  async stopTask() {
-    this.notifyId = 0;
-    this.jobId = 0;
-    this.global.processId = 0;
-    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask") && this.jobId > 0) {
-      // 取消长时任务
-      backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
-    }
-  }
-
-  // 启动长时任务
-  async startBackground() {
-    const wantAgentInfo: wantAgent.WantAgentInfo = {
-      wants: [{ bundleName: this.ctxUIAbility.abilityInfo.bundleName, abilityName: this.ctxUIAbility.abilityInfo.name }],
-      actionType: wantAgent.OperationType.START_ABILITY, requestCode: 0,
-      wantAgentFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
-    };
-    // 监听停止长时任务
-    backgroundTaskManager.on("continuousTaskCancel", (info: backgroundTaskManager.ContinuousTaskCancelInfo) => {
-      // 标记任务状态，然后停止上传
-      console.log(`收到取消长时任务的通知，停止执行当前任务，信息：${JSON.stringify(info)}`);
-      console.log(`当前执行的长时任务ID：${this.notifyId}，要取消的长时任务ID${info.id}`)
-      this.stopTaskEvent();
-    });
-    wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent) => {
-      backgroundTaskManager.startBackgroundRunning(this.ctxUIAbility, ["dataTransfer"], wantAgentObj)
-        .then((res: backgroundTaskManager.ContinuousTaskNotification) => {
-          this.notifyId = res.notificationId;
-          this.jobId = res.continuousTaskId ? res.continuousTaskId : 1;
-          const updateProgressHandleId = setInterval(() => {
-            if (this.notifyId <= 0) {
-              console.log("任务已结束，清除定时通知系统任务进度")
-              clearInterval(updateProgressHandleId);
-              return;
-            }
-            // 每秒更新一次任务进度
-            this.updateNotifyProcess();
-          }, 1000);
-        })
-        .catch((error: BusinessError) => {
-          console.error(`启动长时任务失败. code is ${error.code} message is ${error.message}`);
-        });
-    }).catch((error: BusinessError) => {
-      console.error(`Operation getWantAgent failed. code is ${error.code} message is ${error.message}`);
-    });
-  }
-
-  // 应用更新通知栏进度
-  updateNotifyProcess() {
-    // 应用定义下载类通知模版
-    const total = TaskItem.getWaitCount();
-    const cur = this.global.preTotal - total;
-    const progress = Math.floor(100 - (total / this.global.preTotal * 100))
-    let downLoadTemplate: notificationManager.NotificationTemplate = {
-      name: 'downloadTemplate', // 当前只支持downloadTemplate，保持不变
-      data: {
-        title: `正在备份照片`, // 必填。
-        fileName: `进度：${cur}/${this.global.preTotal}`, // 必填。
-        progressValue: progress, // 应用更新进度值，自定义。
-      }
-    };
-    let request: notificationManager.NotificationRequest = {
-      content: {
-        // 系统实况类型，保持不变
-        notificationContentType: notificationManager.ContentType.NOTIFICATION_CONTENT_SYSTEM_LIVE_VIEW,
-        systemLiveView: {
-          typeCode: 8, // 上传下载类型需要填写 8，当前仅支持此类型。保持不变
-          title: "正在备份照片", // 应用自定义
-          text: `进度：${cur}/${this.global.preTotal}`, // 应用自定义
-          capsule: {
-            title: `备份进度：${cur}/${this.global.preTotal}`
-          }
-        }
-      },
-      id: this.notifyId, // 必须是申请长时任务返回的id，否则应用更新通知失败。
-      notificationSlotType: notificationManager.SlotType.LIVE_VIEW, // 实况窗类型，保持不变
-      template: downLoadTemplate // 应用需要设置的模版名称
-    };
-    notificationManager.publish(request).then(() => {
-    }).catch((err: BusinessError) => {
-      console.error(`更新长时任务进度失败: code: ${err.code}. msg: ${err.message}`);
-    });
-  }
-
   @Builder
   PageMap(name: string) {
     if (name === "login") {
@@ -267,6 +158,8 @@ struct Index {
       Privacy()
     } else if(name == "agreement") {
       Agreement()
+    } else if (name == "taskItemDetail") {
+      TaskItemDetail()
     }
   }
 

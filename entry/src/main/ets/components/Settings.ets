@@ -201,6 +201,6 @@ export struct Settings {
         .width('100%')
       }
     }
-    .backgroundColor($r('app.color.ibest_white'))
+    .backgroundColor($r('app.color.ibest_background'))
   }
 }

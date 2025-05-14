@@ -76,7 +76,7 @@ export class BasicDataSource implements IDataSource {
   }
 }
 
-export class TaskItemDataSource extends BasicDataSource {
+export class WaitTaskItemDataSource extends BasicDataSource {
   dataArray: TaskItem[] = [];
   private total: number = 0;
   private isGetedTotal: boolean = false;
@@ -86,6 +86,48 @@ export class TaskItemDataSource extends BasicDataSource {
       return this.total;
     }
     this.total = TaskItem.getWaitCount();
+    this.isGetedTotal = true;
+    return this.total;
+  }
+
+  public progress(currentSuccess: number, currentFailed: number) {
+    return Math.floor((currentSuccess + currentFailed) / this.totalCount() * 100)
+  }
+
+  public currentCount(): number {
+    return this.dataArray.length;
+  }
+
+  public getData(index: number): TaskItem {
+    return this.dataArray[index];
+  }
+
+  public clearData() {
+    this.dataArray = [];
+    this.isGetedTotal = false;
+  }
+
+  public pushData(data: TaskItem): void {
+    this.dataArray.push(data);
+    this.notifyDataAdd(this.dataArray.length - 1);
+  }
+
+  public removeData(index: number) {
+    this.dataArray.splice(index, 1);
+    this.notifyDataDelete(index);
+  }
+}
+
+export class SucTaskItemDataSource extends BasicDataSource {
+  dataArray: TaskItem[] = [];
+  private total: number = 0;
+  private isGetedTotal: boolean = false;
+
+  public totalCount(): number {
+    if (this.isGetedTotal) {
+      return this.total;
+    }
+    this.total = TaskItem.getSuccessCount();
     this.isGetedTotal = true;
     return this.total;
   }
