@@ -66,17 +66,34 @@ export class TaskUpload {
   async canStart(): Promise<boolean> {
     // 如果打开了低电量暂停任务，则检查电量
     if (!checkBattery(this.config)) {
-      console.error(`电量不足15%，无法执行任务`);
+      IBestToast.show({
+        message: "您开启了低电量停止备份，当前电量不足15%，无法启动备份",
+        type: "warning",
+        duration: 3000
+      })
       return false;
     }
     // 如果打开了仅WIFI备份，则检查网络状态
     if (!(await checkWifi(this.config))) {
-      console.error(`非WIFI，无法执行任务`);
+      IBestToast.show({
+        message: "您开启了仅WIFI备份，但是当前没有连接WIFI，无法启动备份",
+        type: "warning",
+        duration: 3000
+      })
       return false;
     }
     if (!this.config.backupRootPath) {
       IBestToast.show({
         message: "请先设置备份路径",
+        type: "warning",
+        duration: 3000
+      })
+      return false;
+    }
+    const rr = await this.webdav.valid();
+    if (!rr.success) {
+      IBestToast.show({
+        message: "服务器不可用，请检查当前设备的网络环境或者连接状态",
         type: "warning",
         duration: 3000
       })
