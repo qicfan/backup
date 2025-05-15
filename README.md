@@ -1,6 +1,9 @@
 鸿蒙5.0 鸿蒙Next(HarmonyOS Next) 相册备份 使用webdav协议备份到NAS
 目前各个NAS官方的APP都没上架，所以出个平替版解决相册备份的问题。
+
 电报讨论群：[t.me/hmosbackup](t.me/hmosbackup)
+QQ讨论群：1007908887
+
 ## v1.0.0
 - [x] 使用关键资产存储服务器、用户名、密码
 - [x] 使用关系型数据库存储数据
