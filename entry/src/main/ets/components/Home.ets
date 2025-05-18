@@ -9,18 +9,22 @@ import { SucList } from "./SucList";
 import { Global } from "../models/Global";
 import { emitter } from "@kit.BasicServicesKit";
 import { TaskUpload } from "../utils/taskUpload";
+import { TaskBottom } from "./TaskBottom";
 
 
 @ComponentV2
 export struct Home {
-  @Local winBP: WinBreakpoint = AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
+  @Local winBP: WinBreakpoint =
+    AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
+
   aboutToAppear(): void {
   }
-  tabItems: Array<TabItem>  = [
-    {icon: $r('app.media.house'), selectedIcon: $r('app.media.house_fill'), name: "待备份"},
-    {icon: $r('app.media.checkmark_circle'), selectedIcon: $r('app.media.checkmark_circle_fill'), name: "已备份"},
-    {icon: $r('app.media.gearshape'), selectedIcon: $r('app.media.gearshape'), name: "设置"}
+
+  tabItems: Array<TabItem> = [
+    { icon: $r('app.media.house'), selectedIcon: $r('app.media.house_fill'), name: "待备份" },
+    { icon: $r('app.media.checkmark_circle'), selectedIcon: $r('app.media.checkmark_circle_fill'), name: "已备份" },
+    { icon: $r('app.media.gearshape'), selectedIcon: $r('app.media.gearshape'), name: "设置" }
   ]
 
   @Builder
@@ -51,7 +55,8 @@ export struct Home {
       index: this.global.tabIndex
     }) {
       TabContent() {
-        WaitList()
+          // 正常屏幕
+          WaitList();
       }
       .tabBar(this.BottomTabBuilder(this.tabItems[0], 0))
 
@@ -82,10 +87,10 @@ export struct Home {
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .onChange((index: number) => {
       this.global.tabIndex = index;
-      console.log(`tab切换到${index}`)
-      if (index === 0) {
-        (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
-      }
+      // console.log(`tab切换到${index}`)
+      // if (index === 0) {
+      //   (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
+      // }
     })
   }
 }

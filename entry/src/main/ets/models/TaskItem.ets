@@ -187,6 +187,23 @@ export class TaskItem {
     }
   }
 
+  static async getUploadingResultCount(): Promise<number> {
+    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status IN (?, ?)`;
+    try {
+      const rs = await DB.getInstance().store?.querySql(SQL, [TaskItemStatus.WAIT, TaskItemStatus.UPLOADING]);
+      if (rs === undefined || rs.rowCount <= 0) {
+        return 0;
+      }
+      const c = rs.rowCount;
+      rs.close();
+      return c;
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+      return 0;
+    }
+  }
+
   static getSuccessCount(): number {
     const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status=?`;
     try {

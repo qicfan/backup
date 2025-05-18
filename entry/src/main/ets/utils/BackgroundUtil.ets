@@ -64,7 +64,7 @@ export class BackGroundUtil {
               return;
             }
             // 每秒更新一次任务进度
-            this.updateNotifyProcess();
+            this.updateNotifyProcess().then(() => {});
           }, 1000);
         })
         .catch((error: BusinessError) => {
@@ -77,9 +77,9 @@ export class BackGroundUtil {
   }
 
   // 应用更新通知栏进度
-  updateNotifyProcess() {
+  async updateNotifyProcess() {
     // 应用定义下载类通知模版
-    const total = TaskItem.getWaitCount();
+    const total = await TaskItem.getUploadingResultCount();
     const cur = this.global.preTotal - total;
     const progress = Math.floor(100 - (total / this.global.preTotal * 100))
     let downLoadTemplate: notificationManager.NotificationTemplate = {

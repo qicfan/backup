@@ -51,18 +51,26 @@ export struct TaskItemComponent {
     })
     this.updateIcon();
     if (this.taskItem.status !== TaskItemStatus.SUCCESS) {
-      emitter.on(Global.UPDATE_TASK_ITEM_EVENT + '_' + this.taskItem.id, async () => {
+      emitter.on(Global.UPDATE_TASK_ITEM_EVENT + '_' + this.taskItem.id, async (data) => {
         if (!this.taskItem) return;
-        await this.taskItem.fetch();
-        if (this.taskItem.status === TaskItemStatus.SUCCESS) {
-          console.log(`任务成功: ${this.taskItem.id}`)
-          // 成功
+        if (data.data?.action === "START") {
+          this.taskItem.status = TaskItemStatus.UPLOADING;
+        }
+        if (data.data?.action === "SUCCESS") {
+          this.taskItem.status = TaskItemStatus.SUCCESS;
           this.progress = 100;
           this.progressY = 0;
-        } else {
-          // 失败了
+        }
+        if (data.data?.action === "FAIL") {
+          this.taskItem.status = TaskItemStatus.FAIL;
+          this.taskItem.failedReason = data.data?.reason;
           this.progress = 0;
           this.progressY = 100;
+        }
+        if (data.data?.action === "PROGRESS") {
+          this.taskItem.uploadedSize = data.data?.uploadedSize;
+          this.progress = Math.floor(this.taskItem.uploadedSize / this.taskItem.size * 100);
+          this.progressY = 100 - this.progress;
         }
         this.updateIcon();
       })
@@ -89,7 +97,7 @@ export struct TaskItemComponent {
   build() {
     Stack() {
       if (!this.isDelete) {
-        if (this.thumbnail) {
+        if (this.thumbnail !== null) {
           Image(this.thumbnail).width(this.winBP.imageSize).height(this.winBP.imageSize).objectFit(ImageFit.Cover)
             .geometryTransition(this.taskItem?.id + '')
         } else {

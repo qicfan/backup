@@ -2,7 +2,7 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "使用webdav协议将相册被分到NASn"
+      "value": "使用webdav协议将相册被分到NAS"
     },
     {
       "name": "EntryAbility_desc",
@@ -10,7 +10,7 @@
     },
     {
       "name": "EntryAbility_label",
-      "value": "相册备份"
+      "value": "NasBackup"
     },
     {
       "name": "internet_reason",

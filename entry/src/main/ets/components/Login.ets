@@ -50,12 +50,7 @@ export struct Login {
       await this.server.addOrUpdateAsset(this.serverPath, this.username, this.password);
       this.addBtnLoading = false
       this.global.loginStatus = LoginStatus.LOGIN;
-      if (this.pop) {
-        this.pageInfos.pop();
-      } else {
-        this.global.tabIndex = 2;
-        this.pageInfos.pop();
-      }
+      this.pageInfos.pop();
     } catch (error) {
       let err = error as BusinessError;
       IBestNotify.show({

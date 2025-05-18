@@ -1,6 +1,6 @@
 import { IBestNotify } from "@ibestservices/ibest-ui-v2";
 import { ServerConfig } from "../models/Server";
-import { AppStorageV2, ComponentContent } from "@kit.ArkUI";
+import { AppStorageV2, ComponentContent, LevelMode, promptAction } from "@kit.ArkUI";
 import { common, WantAgent, wantAgent } from "@kit.AbilityKit";
 import { Global } from "../models/Global";
 import {
@@ -20,8 +20,18 @@ import { BackGroundUtil } from "../utils/BackgroundUtil";
 import { TaskItemDetail } from "../components/TaskItemDetail";
 
 @Builder
-function buildTip(event: ()=>void) {
-  TipDialog({close: event})
+function buildTip(params: TipDialogParams) {
+  TipDialog({close: params.event, pageInfos: params.pageInfos})
+}
+
+class TipDialogParams {
+  event: (init: boolean) => void = () => {}
+  pageInfos: NavPathStack = new NavPathStack();
+
+  constructor(event: (init: boolean) => void, pageInfos: NavPathStack) {
+    this.event = event;;
+    this.pageInfos = pageInfos;
+  }
 }
 
 @Entry
@@ -31,45 +41,49 @@ struct Index {
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
   @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
-  @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack()
+  @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack();
   @Local creatingTask: boolean = false;
   @Local init: number = 0;
 
+  private uiContext: UIContext = this.getUIContext();
+  private contentNode = new ComponentContent(this.getUIContext(), wrapBuilder(buildTip), new TipDialogParams((init: boolean) => {this.closeDialog(init)},  this.pageInfos));
+
   private openTipDialog() {
-    Dialog.setContext(this.getUIContext());
-    Dialog.setContentNode(new ComponentContent(this.getUIContext(), wrapBuilder(buildTip), () => {this.closeDialog()}));
-    Dialog.setOptions({
+    const node: FrameNode | null = this.getUIContext().getFrameNodeById("home") || null;
+    const options: promptAction.BaseDialogOptions = {
       alignment: DialogAlignment.BottomStart,
-      isModal: true,
       transition: TransitionEffect.move(TransitionEdge.BOTTOM).animation({ duration: 500, curve: Curve.Ease }),
       autoCancel: false,
+      levelMode: LevelMode.EMBEDDED,
+      levelUniqueId: node?.getUniqueId(),
       onWillDismiss: ()=>{
         return false;
       }
-    });
-    Dialog.openDialog();
+    };
+    this.uiContext.getPromptAction().openCustomDialog(this.contentNode, options);
   }
 
-  private closeDialog() {
-    Dialog.closeDialog();
+  private closeDialog(init: boolean) {
+    this.uiContext.getPromptAction().closeCustomDialog(this.contentNode);
     this.initApp().then();
   }
 
   aboutToAppear() {
-    this.initApp().then(() => {});
   }
 
   onPageShow(): void {
     // 从后台转入前台时触发生成新任务
     console.log('进入首页')
-    setTimeout(() => {
+    this.initApp().then((rs) => {
+      if (!rs) return ;
+      console.log(`开始创建任务`);
       (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
-    }, 3000);
+    })
   }
 
   onPageHide(): void {
     console.log('app切换到后台或者离开首页');
-    if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask") && this.global.processId > 0) {
+    if (this.global.processId > 0) {
       console.log(`index 触发 后台任务`);
       (BackGroundUtil.getInstance()).startBackground();
     } else {
@@ -86,17 +100,19 @@ struct Index {
       r2 = await this.checkServer();
       if (r2) {
         await this.checkConfig();
+      } else {
+        return false;
       }
+    } else {
+      return false;
     }
     return true;
   }
 
   // 检查是否第一次打开，如果是则弹出提示窗口
   async checkFirst(): Promise<boolean> {
-    console.log(this.config.first + ', 是否首次打开')
     if (this.config.first === 0) {
       this.openTipDialog();
-      console.log('显示首次弹窗')
       return false;
     }
     return true;
@@ -166,6 +182,7 @@ struct Index {
   build() {
     Navigation(this.pageInfos) {
       Home()
+        .id("home")
     }
     .navDestination(this.PageMap)
     .mode(NavigationMode.Stack)
@@ -174,5 +191,10 @@ struct Index {
     .hideBackButton(true)
     .width('100%')
     .height('100%')
+    .onNavBarStateChange((isVisible: boolean) => {
+      if (!isVisible) return ;
+      console.log(`回到首页`);
+      this.initApp().then(() => {});
+    })
   }
 }

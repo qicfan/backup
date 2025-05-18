@@ -137,8 +137,11 @@ export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
-    hilog.info(DOMAIN_NUMBER, TAG, `want:  ${JSON.stringify(want)}`);
+    // hilog.info(DOMAIN_NUMBER, TAG, `want:  ${JSON.stringify(want)}`);
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance());
+    emitter.once(Global.EXIT_EVENT, () => {
+      this.context.terminateSelf().then(() => {})
+    })
     // try {
     //   if (want.parameters === undefined) {
     //     return ;

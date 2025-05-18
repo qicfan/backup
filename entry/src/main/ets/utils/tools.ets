@@ -56,6 +56,8 @@ export async function copyImg2Sandbox(src: string, path: string, size: number): 
     let stat = await fileIo.stat(destImage.fd);
     if(stat.size === size) {
       exists = true;
+    } else {
+      await fileIo.unlink(path);
     }
   } catch (e) {
     console.log(`获取目标文件${path}的状态出错：code:${e.code}, msg:${e.message}}`)
@@ -65,10 +67,10 @@ export async function copyImg2Sandbox(src: string, path: string, size: number): 
     try {
       await fileIo.copyFile(srcImage.fd, destImage.fd);
     } catch (e) {
-      console.error(`复制文件线程: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`)
+      console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`)
     }
   } else {
-    console.log(`复制文件线程: ${path}已存在`)
+    console.log(`复制文件: ${path}已存在`)
   }
   await fileIo.close(srcImage);
   await fileIo.close(destImage);

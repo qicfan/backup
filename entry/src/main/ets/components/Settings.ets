@@ -197,10 +197,10 @@ export struct Settings {
             contentBuilder: (): void => this.pickerBuilder()
           })
         }
-        .padding({ bottom: 30 })
+        .padding({ bottom: 30, top: 10 })
         .width('100%')
       }
     }
-    .backgroundColor($r('app.color.ibest_background'))
+    .backgroundColor($r('app.color.ibest_white'))
   }
 }

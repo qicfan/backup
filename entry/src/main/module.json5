@@ -7,8 +7,6 @@
     "deviceTypes": [
       "phone",
       "tablet",
-      "2in1",
-      "car"
     ],
     "deliveryWithInstall": true,
     "installationFree": false,
@@ -23,7 +21,8 @@
         "startWindowIcon": "$media:app_icon",
         "startWindowBackground": "$color:start_window_background",
         "exported": true,
-        //        "orientation": "auto_rotation",
+        "removeMissionAfterTerminate": true,
+        "orientation": "portrait",
         "backgroundModes": [
           "dataTransfer"
         ],

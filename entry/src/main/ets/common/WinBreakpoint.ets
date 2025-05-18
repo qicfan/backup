@@ -6,6 +6,8 @@ export class WinBreakpoint implements WindowBreakpoint {
   @Trace currentHeightBreakpoint: string = BreakpointConstants.BREAKPOINT_LG;
   @Trace currentWidthBreakpoint: string = BreakpointConstants.BREAKPOINT_LG;
   @Trace imageSize: number = 0;
+  imagePageSize: number = 20;
+
   @Trace
   width: number = 0;
   height: number = 0;
@@ -36,5 +38,6 @@ export class WinBreakpoint implements WindowBreakpoint {
   updateImageSize() {
     const columns = WinBreakpoint.breakpointCol[this.currentWidthBreakpoint];
     this.imageSize = Math.floor((this.width - 24 - (columns * 3)) / columns);
+    this.imagePageSize = Math.floor(this.height / this.imageSize * columns) + 10;
   }
 }

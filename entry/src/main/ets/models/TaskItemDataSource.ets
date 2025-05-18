@@ -81,6 +81,10 @@ export class WaitTaskItemDataSource extends BasicDataSource {
   private total: number = 0;
   private isGetedTotal: boolean = false;
 
+  public resetTotalCount() {
+    this.isGetedTotal = false;
+  }
+
   public totalCount(): number {
     if (this.isGetedTotal) {
       return this.total;
@@ -110,6 +114,12 @@ export class WaitTaskItemDataSource extends BasicDataSource {
   public pushData(data: TaskItem): void {
     this.dataArray.push(data);
     this.notifyDataAdd(this.dataArray.length - 1);
+  }
+
+  public addData(data: TaskItem[]): void {
+    let len = this.dataArray.length;
+    this.dataArray = this.dataArray.concat(data);
+    this.notifyDataAdd(len);
   }
 
   public removeData(index: number) {
@@ -152,6 +162,12 @@ export class SucTaskItemDataSource extends BasicDataSource {
   public pushData(data: TaskItem): void {
     this.dataArray.push(data);
     this.notifyDataAdd(this.dataArray.length - 1);
+  }
+
+  public addData(data: TaskItem[]): void {
+    let len = this.dataArray.length;
+    this.dataArray = this.dataArray.concat(data);
+    this.notifyDataAdd(len);
   }
 
   public removeData(index: number) {

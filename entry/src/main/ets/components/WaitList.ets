@@ -10,6 +10,7 @@ import { AppStorageV2 } from "@kit.ArkUI";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 import { TaskDoing } from "../typing";
+import { BreakpointConstants } from "../common/BreakpointConstants";
 
 @ComponentV2
 export struct WaitList {
@@ -23,12 +24,14 @@ export struct WaitList {
 
   private scroller: Scroller = new Scroller();
   page: number = 1;
-  pageSize: number = 50;
+  @Local pageSize: number = 100;
   aboutToAppear(): void {
     this.getList(1).then(() => {})
-    emitter.on(Global.COLLECT_PHOTO_FINISH_EVENT, () => {
-      // 如果有新项目则刷新页面
-      this.getList(1).then(() => {})
+    emitter.on(Global.COLLECT_PHOTO_FINISH_EVENT, (data) => {
+      if (data.data?.exists === true) {
+        // 如果有新项目则刷新页面
+        this.getList(1).then(() => {})
+      }
     })
     emitter.on(Global.BACKUP_TASK_FINISH, () => {
       // 备份完成后刷新页面
@@ -37,7 +40,9 @@ export struct WaitList {
   }
 
   async getList(page: number = 1) {
+    this.pageSize = this.winBP.imagePageSize;
     if (page === 1) {
+      this.data.resetTotalCount();
       this.total = this.data.totalCount();
     }
     this.page = page;
@@ -46,11 +51,9 @@ export struct WaitList {
     if (this.page === 1) {
       this.data.clearData();
     }
-    items.forEach((item: TaskItem) => {
-      this.data.pushData(item);
-    })
+    this.data.addData(items);
     if (this.page === 1) {
-      this.data.notifyDataReload()
+      this.data.notifyDataReload();
     }
   }
 
@@ -82,45 +85,48 @@ export struct WaitList {
 
   build() {
     Column() {
-      Refresh({ refreshing: $$this.isRefreshing, promptText: "下拉刷新待备份列表"}) {
-        if (this.total > 0) {
-          Grid(this.scroller) {
-            LazyForEach(this.data, (item: TaskItem, index: number) => {
-              GridItem() {
-                TaskItemComponent({ taskItem: item, index: index })
-              }
-            }, (item: TaskItem) => item ? item.id + '' : "0")
-          }
-          .margin($r('app.float.normal_padding'))
-          .cachedCount(10)
-          .rowsGap(3)
-          .columnsGap(3)
-          .columnsTemplate(`repeat(auto-fit, ${this.winBP.imageSize})`)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.PARENT_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST,
-          })
-          .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-          .scrollBar(BarState.Auto)
-          .onScrollIndex((start: number, end: number) => {
-            if (!this.hasMore) return ;
-            if (end < this.data.currentCount() - 1) return;
-            this.isLoading = true;
-            this.getList(this.page + 1).then(() => {
-              this.isLoading = false;
+      if (this.winBP.currentWidthBreakpoint !== BreakpointConstants.BREAKPOINT_SM ||
+        this.winBP.currentHeightBreakpoint !== BreakpointConstants.BREAKPOINT_MD) {
+        Refresh({ refreshing: $$this.isRefreshing, promptText: "下拉刷新待备份列表" }) {
+          if (this.total > 0) {
+            Grid(this.scroller) {
+              LazyForEach(this.data, (item: TaskItem, index: number) => {
+                GridItem() {
+                  TaskItemComponent({ taskItem: item, index: index })
+                }
+              }, (item: TaskItem) => item ? item.id + '' : "0")
+            }
+            .margin($r('app.float.normal_padding'))
+            .cachedCount(this.pageSize * 2)
+            .rowsGap(3)
+            .columnsGap(3)
+            .columnsTemplate(`repeat(auto-fit, ${this.winBP.imageSize})`)
+            .nestedScroll({
+              scrollForward: NestedScrollMode.PARENT_FIRST,
+              scrollBackward: NestedScrollMode.SELF_FIRST,
             })
-          })
-        } else {
-          IBestEmpty({
-            description: "没有需要备份的照片或视频"
-          })
+            .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+            .scrollBar(BarState.Auto)
+            .onScrollIndex((start: number, end: number) => {
+              if (!this.hasMore) return;
+              if (end < this.data.currentCount() - 1) return;
+              this.isLoading = true;
+              this.getList(this.page + 1).then(() => {
+                this.isLoading = false;
+              })
+            })
+          } else {
+            IBestEmpty({
+              description: "没有需要备份的照片或视频"
+            })
+          }
         }
+        .width('100%')
+        .layoutWeight(1)
+        .onRefreshing(() => {
+          this.onRefresh('pull')
+        })
       }
-      .width('100%')
-      .layoutWeight(1)
-      .onRefreshing(() => {
-        this.onRefresh('pull')
-      })
       if (this.total > 0 && this.global.taskGlobalStatus === TaskDoing.NO) {
         TaskBottom()
           .width('100%')

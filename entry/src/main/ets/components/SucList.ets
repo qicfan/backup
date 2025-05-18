@@ -34,11 +34,9 @@ export struct SucList {
     if (this.page === 1) {
       this.data.clearData();
     }
-    items.forEach((item: TaskItem) => {
-      this.data.pushData(item);
-    })
+    this.data.addData(items);
     if (this.page === 1) {
-      this.data.notifyDataReload()
+      this.data.notifyDataReload();
     }
   }
 

@@ -4,8 +4,11 @@ import { ServerConfig } from "./Server";
 import { TaskItem } from "./TaskItem";
 
 export class UploadItemSendable {
-  taskId: number = 0; // 任务ID
   taskItemId: number = 0; // 任务文件ID
+  photoType: number = 0;
+  subType: number = 0; // 文件名称
+  imageUri: string = ""; // 图片资源路径
+  videoUri: string = ""; // 动态图的视频文件路径
   name: string = ""; // 文件名称
   fileUri: string = ""; // 本地文件路径
   remoteUri: string = ""; // 远程文件路径
@@ -22,7 +25,6 @@ export class UploadItemSendable {
     this.sendableContext = sendableContextManager.convertFromContext(context);
     this.type = type;
     this.auth = auth;
-    this.taskId = taskItem.taskId;
     this.taskItemId = taskItem.id;
     this.name = taskItem.name;
     if (type === 1) {

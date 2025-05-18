@@ -1,8 +1,5 @@
-import { IBestToast } from '@ibestservices/ibest-ui-v2';
 import { abilityAccessCtrl, bundleManager, common, Permissions } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { Global } from '../models/Global';
-import { AccessStatus } from '../typing';
 
 export async function checkPermissionGrant(permission: Permissions): Promise<abilityAccessCtrl.GrantStatus> {
   let atManager: abilityAccessCtrl.AtManager = abilityAccessCtrl.createAtManager();
@@ -49,7 +46,7 @@ export async function reqPermissionsFromUser(context: common.UIAbilityContext, p
     for (let i = 0; i < length; i++) {
       if (grantStatus[i] !== 0) {
         // 用户拒绝授权，提示用户必须授权才能访问当前页面的功能，并引导用户到系统设置中打开相应的权限
-        IBestToast.show("没有相册读取权限无法完成备份工作，请到'设置 > 应用和元服务 > 相册备份'中打开'图片和视频 -> 仅读取'权限后再重新打开本应用")
+        // IBestToast.show("没有相册读取权限无法完成备份工作，请到'设置 > 应用和元服务 > 相册备份'中打开'图片和视频 -> 仅读取'权限后再重新打开本应用")
         return false
       }
     }

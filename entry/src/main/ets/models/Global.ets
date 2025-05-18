@@ -28,5 +28,6 @@ export class Global {
   static BACKUP_COPY_FINISH = 'BACKUP.COPY.FINISH'; // 文件复制完成事件
   static BACKUP_TASK_FINISH = "BACKUP.TASK.FINISH"; // 备份任务已完成
   static BACKUP_PAUSE = 'BACKUP.PAUSE'; // 暂停事件
+  static EXIT_EVENT = "APP.EXIT";
   static PAUSE = false; // 是否暂停任务
 }

@@ -14,28 +14,51 @@ export struct TaskBottom {
   @Local progress: number = 0;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
-  @Consumer("taskItemDataSource") data: WaitTaskItemDataSource = new WaitTaskItemDataSource();
+
+  private handleId: number|null = null;
 
   aboutToAppear(): void {
     this.total = TaskItem.getWaitCount();
   }
 
   async startTask() {
-    this.global.preTotal = this.total;
-    emitter.on(Global.BACKUP_UPLOAD_WORKER_IDLE, () => this.updateProgress());
-    (TaskUpload.getInstance()).start();
+    (TaskUpload.getInstance()).start(this.total);
+    // 定时更新进度
+    this.handleId = setInterval(() => {
+      this.updateProgress();
+    }, 1000);
+    emitter.once(Global.BACKUP_TASK_FINISH, () => {
+      this.updateProgress();
+      if (this.handleId) {
+        clearInterval(this.handleId);
+        this.handleId = null;
+      }
+    })
+    emitter.once(Global.STOP_TASK_EVENT, () => {
+      this.updateProgress();
+      if (this.handleId) {
+        clearInterval(this.handleId);
+        this.handleId = null;
+      }
+    });
     return true;
-  }
-
-  updateProgress() {
-    this.total  = TaskItem.getWaitCount();
-    this.progress = Math.floor(100 - (this.total / this.global.preTotal * 100))
   }
 
   stopTask() {
     (TaskUpload.getInstance()).stop();
-    emitter.off(Global.BACKUP_UPLOAD_WORKER_IDLE, () => this.updateProgress());
+    if (this.handleId) {
+      clearInterval(this.handleId);
+      this.handleId = null;
+    }
   }
+
+  updateProgress() {
+    TaskItem.getUploadingResultCount().then((c: number) => {
+      this.total = c;
+      this.progress = Math.floor(100 - (this.total / this.global.preTotal * 100));
+    })
+  }
+
 
   build() {
     Column() {
