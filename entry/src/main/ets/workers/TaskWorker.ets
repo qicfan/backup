@@ -11,6 +11,8 @@ import { Global } from '../models/Global';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { Photos } from '../utils/photos';
 import { TaskItemSendable } from '../models/TaskItemSendable';
+import { fileIo } from '@kit.CoreFileKit';
+import image from '@ohos.multimedia.image';
 
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
 const TABLE_NAME = "task_items";
@@ -291,7 +293,7 @@ function updateSize(taskItemId: number, size: number, videoSize: number) {
   return;
 }
 
-async function copyFile(context: common.Context, taskItemId: number, subType: photoAccessHelper.PhotoSubtype,
+async function copyFile(context: common.Context, taskItemId: number, photoType: photoAccessHelper.PhotoType, subType: photoAccessHelper.PhotoSubtype,
   size: number, uri: string, imageUri: string, videoUri: string): Promise<number[] | null> {
   let videoSize: number;
   if (subType === photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
@@ -303,10 +305,20 @@ async function copyFile(context: common.Context, taskItemId: number, subType: ph
     videoSize = fileSize(videoUri);
   } else {
     // 普通图片和视频
-    copyImg2Sandbox(uri, imageUri, size);
+    if (photoType === photoAccessHelper.PhotoType.IMAGE) {
+        const rs = await Photos.saveImage(context, uri, imageUri);
+        if (rs !== "success") {
+          throw new Error(rs);
+        }
+    }
+    if (photoType === photoAccessHelper.PhotoType.VIDEO) {
+        const rs = await Photos.saveVideo(context, uri, imageUri);
+        if (rs !== "success") {
+          throw new Error(rs);
+        }
+    }
     videoSize = 0;
   }
-
   updateSize(taskItemId, size, videoSize);
   return [size, videoSize];
 }
@@ -317,14 +329,12 @@ function getBase64Auth(username: string, password: string): string {
 
 function getWaitList(offset: number = 1, limit: number = 100): relationalStore.ResultSet | null {
   const SQL = `SELECT * FROM task_items WHERE status IN (1,3,4) ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`;
-  // const SQL = `SELECT * FROM task_items`;
-  // console.log(`SELECT * FROM ${TABLE_NAME} WHERE status IN (${TaskItemStatus.WAIT}, ${TaskItemStatus.UPLOADING}, ${TaskItemStatus.FAIL}) ORDER BY id ASC LIMIT ${limit} OFFSET ${offset}`)
   try {
     const rs = db.store?.querySqlSync(SQL);
     // const rs = db.store?.querySqlSync(SQL);
     if (rs === undefined || rs.rowCount <= 0) {
       rs?.close();
-      console.log(`查询结果是undefine或者返回结果数：${rs?.rowCount}`);
+      console.log(`查询结果是undefine或者返回结果数：${rs?.rowCount}, ${offset}, ${limit}`);
       return null;
     }
     return rs;
@@ -494,14 +504,16 @@ async function doTask(uploadItem: TaskItemSendable): Promise<boolean> {
     let remoteUri: string = resultSet.getString(resultSet.getColumnIndex('remote_uri'));
     const videoUri: string = resultSet.getString(resultSet.getColumnIndex('video_uri'));
     let videoRemoteUri: string = resultSet.getString(resultSet.getColumnIndex('remote_video_uri'));
+    const photoType = resultSet.getLong(resultSet.getColumnIndex('photo_type'));
     const subType = resultSet.getLong(resultSet.getColumnIndex('sub_type'));
     const size = resultSet.getLong(resultSet.getColumnIndex('size'));
     try {
       start(taskItemId);
-      const sizeArr = await copyFile(context, taskItemId, subType, size, uri, imageUri, videoUri);
+      const sizeArr = await copyFile(context, taskItemId, photoType, subType, size, uri, imageUri, videoUri);
       if (sizeArr === null) {
         // 复制文件失败，跳过
-        fail(taskItemId, "导出动态图的封面和视频出错");
+        fail(taskItemId, "导出照片出错，可能已被删除");
+        console.log("导出照片出错，可能已被删除");
         continue;
       }
       const videoSize = sizeArr[1];
@@ -513,6 +525,7 @@ async function doTask(uploadItem: TaskItemSendable): Promise<boolean> {
           videoRemoteUri, videoSize, name, auth);
       }
     } catch (e) {
+      console.log(`上传出错：code:${e.code}, msg:${e.message}`);
       FINISH ++;
       fail(taskItemId, e.message);
       deleteFile(imageUri);

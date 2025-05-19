@@ -101,17 +101,17 @@ export class WorkerPool {
 
     // 定时刷新任务状态
     const handleId = setInterval(() => {
+      let idle: number = 0;
       for (let i=0; i<this.workerItems.length; i++) {
-        if (this.workerItems[i].isIdle) this.current --;
-        // console.log(`定时检查完成任务的线程，进行中：${this.current},总计: ${this.max}`)
-        if (this.current > 0) return ;
-        Global.getInstance().processId = 0;
-        console.log(`结束worker poll定时任务`);
-        clearInterval(handleId);
-        // 完成了任务
-        emitter.emit(Global.BACKUP_TASK_FINISH);
-
+        if (this.workerItems[i].isIdle) idle ++;
       }
+      this.current = this.max - idle;
+      if (this.current > 0) return ;
+      Global.getInstance().processId = 0;
+      console.log(`结束worker pool定时任务`);
+      clearInterval(handleId);
+      // 完成了任务
+      emitter.emit(Global.BACKUP_TASK_FINISH);
     }, 1000);
   }
 

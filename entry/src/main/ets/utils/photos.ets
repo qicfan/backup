@@ -5,6 +5,7 @@ import { BusinessError } from "@kit.BasicServicesKit";
 import { TaskItem } from "../models/TaskItem";
 import { image } from "@kit.ImageKit";
 import { fileSize } from "./tools";
+import { fileIo } from "@kit.CoreFileKit";
 
 export class Photos {
   /**
@@ -139,6 +140,96 @@ export class Photos {
     });
   }
 
+  static async saveVideo(ctx: Context, uri: string, videoUri: string): Promise<string> {
+    return new Promise(async (resolve, reject) => {
+      let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
+      predicates.equalTo(photoAccessHelper.PhotoKeys.PHOTO_TYPE, photoAccessHelper.PhotoType.VIDEO).and().equalTo('uri', uri);
+      let fetchOptions: photoAccessHelper.FetchOptions = {
+        fetchColumns: [],
+        predicates: predicates
+      };
+      let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx);
+      let assetResult: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> = await phAccessHelper.getAssets(fetchOptions);
+      if (!assetResult || assetResult.getCount() <= 0) {
+        resolve("无法查询到图片数据")
+        return;
+      }
+      let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
+      let requestOptions: photoAccessHelper.RequestOptions = {
+        deliveryMode: photoAccessHelper.DeliveryMode.HIGH_QUALITY_MODE,
+      }
+
+      try {
+        await photoAccessHelper.MediaAssetManager.requestVideoFile(ctx, asset, requestOptions, videoUri, {
+          onDataPrepared: (success: boolean) => {
+            if (!success) {
+              resolve("读取视频数据出错，请检查该视频是否存在或重试");
+              return ;
+            }
+            resolve('success');
+          }
+        });
+      } catch (err) {
+        console.error(`failed to request video, error code is ${err.code}, message is ${err.message}`);
+        reject(err)
+      }
+    });
+  }
+
+  static async saveImage(ctx: Context, uri: string, imageUri: string): Promise<string> {
+    return new Promise(async (resolve, reject) => {
+      let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
+      predicates.equalTo(photoAccessHelper.PhotoKeys.PHOTO_TYPE, photoAccessHelper.PhotoType.IMAGE).and().equalTo('uri', uri);
+      let fetchOptions: photoAccessHelper.FetchOptions = {
+        fetchColumns: [],
+        predicates: predicates
+      };
+      let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx);
+      let assetResult: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> = await phAccessHelper.getAssets(fetchOptions);
+      if (!assetResult || assetResult.getCount() <= 0) {
+        console.error("无法查询到图片数据")
+        resolve("无法查询到图片数据");
+        return;
+      }
+      let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
+      let requestOptions: photoAccessHelper.RequestOptions = {
+        deliveryMode: photoAccessHelper.DeliveryMode.HIGH_QUALITY_MODE,
+      }
+      try {
+        await photoAccessHelper.MediaAssetManager.requestImageData(ctx, asset, requestOptions, {
+          onDataPrepared: (data: ArrayBuffer) => {
+            console.log('f');
+            if (data === undefined) {
+              console.error("读取图片数据出错，请检查该图片是否存在或重试")
+              resolve("读取图片数据出错，请检查该图片是否存在或重试");
+              return ;
+            }
+
+            try {
+              // 写入文件
+              const destFile = fileIo.openSync(imageUri, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+              try {
+                fileIo.statSync(destFile.fd);
+                // fileIo.unlinkSync(imageUri);
+              } catch (err) {
+                console.error(`查询文件状态出错, error code is ${err.code}, message is ${err.message}`);
+              }
+              fileIo.writeSync(destFile.fd, data);
+              fileIo.closeSync(destFile.fd);
+              resolve('success');
+            } catch (err) {
+              console.error(`写入图片文件出错, error code is ${err.code}, message is ${err.message}`);
+              reject(err)
+            }
+          }
+        });
+      } catch (err) {
+        console.error(`failed to request image, error code is ${err.code}, message is ${err.message}`);
+        reject(err)
+      }
+    });
+  }
+
   // 将动态图片的图片和视频保存到本地沙箱文件
   static async saveMovingPhoto(ctx: Context, uri: string, imageUri: string, videoUri: string): Promise<string> {
     return new Promise(async (resolve, reject) => {
@@ -161,7 +252,7 @@ export class Photos {
       }
 
       try {
-        let requestId: string = await photoAccessHelper.MediaAssetManager.requestMovingPhoto(ctx, asset, requestOptions, {
+        await photoAccessHelper.MediaAssetManager.requestMovingPhoto(ctx, asset, requestOptions, {
           onDataPrepared: (movingPhoto: photoAccessHelper.MovingPhoto) => {
             if (movingPhoto === undefined) {
               resolve("读取动态图片数据出错，请检查该图片是否存在或重试")

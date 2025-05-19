@@ -7,28 +7,6 @@ import { LowBatteryStop, OnlyWIFIBackup } from '../typing';
 import { IBestNotify } from '@ibestservices/ibest-ui-v2';
 import { Config } from '../models/Config';
 
-export async function copyPhoto(uri: string, size: number, destFilePath: string) {
-  let destPath: fileIo.File;
-  let file: fileIo.File;
-  let fileStat: fileIo.Stat;
-  try {
-    destPath = await fileIo.open(destFilePath, fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY);
-  } catch(e) {
-    console.log(`创建临时文件${destFilePath}失败, code:${e.code}. msg:${e.message}`)
-    return false;
-  }
-  try {
-    file = await fileIo.open(uri);
-  } catch(e) {
-    console.log(`打开${uri}失败, code:${e.code}. msg:${e.message}`)
-    return false;
-  }
-  await fileIo.copyFile(file.fd, destPath.fd);
-  await fileIo.close(file.fd)
-  await fileIo.close(destPath.fd)
-  return true;
-}
-
 /**
  * Copy the source image into sandbox.
  * @param src - source image path
@@ -53,7 +31,7 @@ export function copyImg2Sandbox(src: string, path: string, size: number): boolea
   }
   let exists: boolean = false;
   try {
-    let stat = fileIo.statSync(destImage.fd);
+    const stat = fileIo.statSync(destImage.fd);
     if(stat.size === size) {
       exists = true;
     } else {
@@ -66,7 +44,7 @@ export function copyImg2Sandbox(src: string, path: string, size: number): boolea
   if (!exists) {
     try {
       fileIo.copyFileSync(srcImage.fd, destImage.fd);
-      console.log(`复制文件: ${path} 成功`)
+      console.log(`复制文件: ${path} 成功`);
     } catch (e) {
       console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`)
     }
@@ -87,7 +65,7 @@ export function deleteFile(filePath: string) {
   } catch (e) {
     console.error(`删除文件错误，code:${e.code}, 错误信息：${e.message}`)
   }
-  return
+  return;
 }
 
 export function splitFileExt(filePath: string): string[] {
