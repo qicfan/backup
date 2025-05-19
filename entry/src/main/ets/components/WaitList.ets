@@ -42,8 +42,7 @@ export struct WaitList {
   async getList(page: number = 1) {
     this.pageSize = this.winBP.imagePageSize;
     if (page === 1) {
-      this.data.resetTotalCount();
-      this.total = this.data.totalCount();
+      this.total = TaskItem.getWaitCount();
     }
     this.page = page;
     // 查询未备份照片列表
@@ -58,7 +57,7 @@ export struct WaitList {
   }
 
   get hasMore(): boolean {
-    if (this.data.currentCount() >= this.data.totalCount()) return false;
+    if (this.data.totalCount() >= this.total) return false;
     return true;
   }
 
@@ -75,6 +74,7 @@ export struct WaitList {
       })
     } else {
       // 上滑加载更多
+      console.log(`加载更多,页数:${this.page + 1}, pageSize: ${this.winBP.imagePageSize}`)
       this.getList(this.page + 1).then(() => {
         console.log(`hasMore: ${this.hasMore}`)
         console.log('onRefreshing slide');
@@ -108,8 +108,9 @@ export struct WaitList {
             .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
             .scrollBar(BarState.Auto)
             .onScrollIndex((start: number, end: number) => {
+              console.log(`scroll index start=${start}, end=${end}`)
               if (!this.hasMore) return;
-              if (end < this.data.currentCount() - 1) return;
+              if (end < this.data.totalCount() - 1) return;
               this.isLoading = true;
               this.getList(this.page + 1).then(() => {
                 this.isLoading = false;

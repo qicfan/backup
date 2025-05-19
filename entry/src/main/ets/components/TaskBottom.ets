@@ -8,6 +8,7 @@ import { Config } from "../models/Config";
 import { TaskUpload } from "../utils/taskUpload";
 import { TaskItem } from "../models/TaskItem";
 
+
 @ComponentV2
 export struct TaskBottom {
   @Local total: number = 0;
@@ -22,9 +23,10 @@ export struct TaskBottom {
   }
 
   async startTask() {
-    (TaskUpload.getInstance()).start(this.total);
+    (TaskUpload.getInstance()).start(getContext(this), this.total);
     // 定时更新进度
     this.handleId = setInterval(() => {
+      // console.log(`task bottom 定期检查进度`)
       this.updateProgress();
     }, 1000);
     emitter.once(Global.BACKUP_TASK_FINISH, () => {

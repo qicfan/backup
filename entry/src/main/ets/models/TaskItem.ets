@@ -120,14 +120,15 @@ export class TaskItem {
    * @param pageSize
    * @returns
    */
-  static async getWaitList(page: number = 1, pageSize: number = 100): Promise<TaskItem[]> {
+  static async getWaitList(page: number = 1, pageSize: number = 10): Promise<TaskItem[]> {
     const offset = (page - 1) * pageSize;
-    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status IN (?, ?, ?) ORDER BY id ASC LIMIT ?, ?`;
+    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status IN (?, ?, ?) ORDER BY id DESC LIMIT ? OFFSET ?`;
     try {
-      const rs = await DB.getInstance().store?.querySql(SQL, [TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, TaskItemStatus.FAIL, offset, pageSize]);
+      const rs = await DB.getInstance().store?.querySql(SQL, [TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, TaskItemStatus.FAIL, pageSize, offset]);
       if (rs === undefined || rs.rowCount <= 0) {
         return [];
       }
+      console.log(`查询到的待备份总数:${rs.rowCount}`);
       const items: TaskItem[] = [];
       while (rs.goToNextRow()) {
         const taskItem = TaskItem.getInstance(rs);
@@ -150,7 +151,7 @@ export class TaskItem {
    */
   static async getSuccessList(page: number = 1, pageSize: number = 100): Promise<TaskItem[]> {
     const offset = (page - 1) * pageSize;
-    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status=? ORDER BY id ASC LIMIT ?, ?`;
+    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status=? ORDER BY id DESC LIMIT ?, ?`;
     try {
       const rs = await DB.getInstance().store?.querySql(SQL, [TaskItemStatus.SUCCESS, offset, pageSize]);
       if (rs === undefined || rs.rowCount <= 0) {

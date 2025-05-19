@@ -41,7 +41,7 @@ export struct SucList {
   }
 
   get hasMore(): boolean {
-    if (this.data.currentCount() >= this.data.totalCount()) return false;
+    if (this.data.totalCount() >= this.total) return false;
     return true;
   }
 
@@ -86,7 +86,7 @@ export struct SucList {
           .scrollBar(BarState.Auto)
           .onScrollIndex((start: number, end: number) => {
             if (!this.hasMore) return ;
-            if (end < this.data.currentCount() - 1) return;
+            if (end < this.data.totalCount() - 1) return;
             this.isLoading = true;
             this.getList(this.page + 1).then(() => {
               this.isLoading = false;

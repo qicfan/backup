@@ -35,29 +35,29 @@ export async function copyPhoto(uri: string, size: number, destFilePath: string)
  * @param path - sandbox path
  * @returns Promise<string>
  */
-export async function copyImg2Sandbox(src: string, path: string, size: number): Promise<boolean> {
+export function copyImg2Sandbox(src: string, path: string, size: number): boolean {
   // 检查文件是否存在，大小是否一致
   let srcImage: fileIo.File;
   let destImage: fileIo.File;
   try {
-    srcImage = await fileIo.open(src, fileIo.OpenMode.READ_ONLY);
+    srcImage = fileIo.openSync(src, fileIo.OpenMode.READ_ONLY);
   } catch (e) {
     console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`);
     return false;
   }
   try {
-    destImage = await fileIo.open(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+    destImage = fileIo.openSync(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
   } catch (e) {
     console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`);
     return false;
   }
   let exists: boolean = false;
   try {
-    let stat = await fileIo.stat(destImage.fd);
+    let stat = fileIo.statSync(destImage.fd);
     if(stat.size === size) {
       exists = true;
     } else {
-      await fileIo.unlink(path);
+      fileIo.unlinkSync(path);
     }
   } catch (e) {
     console.log(`获取目标文件${path}的状态出错：code:${e.code}, msg:${e.message}}`)
@@ -65,15 +65,16 @@ export async function copyImg2Sandbox(src: string, path: string, size: number): 
   }
   if (!exists) {
     try {
-      await fileIo.copyFile(srcImage.fd, destImage.fd);
+      fileIo.copyFileSync(srcImage.fd, destImage.fd);
+      console.log(`复制文件: ${path} 成功`)
     } catch (e) {
       console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`)
     }
   } else {
     console.log(`复制文件: ${path}已存在`)
   }
-  await fileIo.close(srcImage);
-  await fileIo.close(destImage);
+  fileIo.closeSync(srcImage);
+  fileIo.closeSync(destImage);
   return true;
 }
 

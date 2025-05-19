@@ -19,9 +19,6 @@ export class DB {
     return DB._instance;
   }
 
-  constructor() {
-  }
-
   public static init(context: Context) {
     return new Promise((resolve: (rs: boolean) => void, reject: (reason: Error) => void) => {
       if (DB.getInstance().isInit) {
@@ -32,7 +29,7 @@ export class DB {
           console.error(`Failed to get RdbStore. Code:${err.code}, message:${err.message}`);
           return reject(err);
         }
-        console.info('Succeeded in getting RdbStore.');
+        // console.info('Succeeded in getting RdbStore. store version ' + store.version);
         DB.getInstance().store = store
         // 当数据库创建时，数据库默认版本为0
         if (store.version === 0) {
@@ -47,22 +44,9 @@ export class DB {
             "    created_at       INTEGER,\n" +
             "    updated_at       INTEGER\n" +
             ");\n"
-          const CREATE_TASK_TABLE = "CREATE TABLE task (\n" +
-            "    id         INTEGER PRIMARY KEY AUTOINCREMENT,\n" +
-            "    type       INTEGER DEFAULT (1),\n" +
-            "    size       INTEGER DEFAULT (0),\n" +
-            "    uploaded_size     INTEGER,\n" +
-            "    total      INTEGER DEFAULT (0),\n" +
-            "    success    INTEGER DEFAULT (0),\n" +
-            "    failed     INTEGER DEFAULT (0),\n" +
-            "    status     INTEGER DEFAULT (0),\n" +
-            "    cancel_reason    TEXT (1024),\n" +
-            "    created_at INTEGER,\n" +
-            "    updated_at INTEGER\n" +
-            ");";
           const CREATE_TASK_ITEMS_TABLE = "CREATE TABLE task_items (\n" +
             "    id         INTEGER PRIMARY KEY AUTOINCREMENT,\n" +
-            "    task_id     INTEGER,\n" +
+            "    task_id     INTEGER DEFAULT (0),\n" +
             "    name    TEXT (1024),\n" +
             "    uri    TEXT (1024),\n" +
             "    file_uri    TEXT (1024),\n" +
@@ -89,13 +73,6 @@ export class DB {
           } catch (e) {
             const err = e as BusinessError
             console.error("config table create error." + `code: ${err.code}, msg: ${err.message}`)
-          }
-          try {
-            store.executeSql(CREATE_TASK_TABLE);
-            console.log("task table created.")
-          } catch (e) {
-            const err = e as BusinessError
-            console.error("task table create error." + `code: ${err.code}, msg: ${err.message}`)
           }
           try {
             store.executeSql(CREATE_TASK_ITEMS_TABLE);

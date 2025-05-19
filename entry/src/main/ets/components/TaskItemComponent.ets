@@ -53,6 +53,7 @@ export struct TaskItemComponent {
     if (this.taskItem.status !== TaskItemStatus.SUCCESS) {
       emitter.on(Global.UPDATE_TASK_ITEM_EVENT + '_' + this.taskItem.id, async (data) => {
         if (!this.taskItem) return;
+        console.log(`收到taskitem update event: ${JSON.stringify(data)}`);
         if (data.data?.action === "START") {
           this.taskItem.status = TaskItemStatus.UPLOADING;
         }

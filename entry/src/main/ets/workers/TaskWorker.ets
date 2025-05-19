@@ -13,7 +13,7 @@ import { Photos } from '../utils/photos';
 import { TaskItemSendable } from '../models/TaskItemSendable';
 
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
-
+const TABLE_NAME = "task_items";
 const db: DB = DB.getInstance();
 let TOTAL: number = 0;
 let FINISH: number = 0;
@@ -25,15 +25,16 @@ let FINISH: number = 0;
  */
 workerPort.onmessage = (event: MessageEvents) => {
   // console.log(`上传线程收到消息：${JSON.stringify(event.data)}`)
-  doTask(event.data).then((rs) => {
-    const intervalHandlerId = setInterval(() => {
-      if (FINISH < TOTAL) return;
-      clearInterval(intervalHandlerId);
-      workerPort.postMessage({
-        action: "FINISH"
-      })
-    }, 1000);
-  })
+  TOTAL = event.data.limit;
+  doTask(event.data).then(() => {});
+  const intervalHandlerId = setInterval(() => {
+    // console.log(`定时检查子线程任务状态：总计：${TOTAL}， 已完成：${FINISH}`)
+    if (FINISH < TOTAL) return;
+    clearInterval(intervalHandlerId);
+    workerPort.postMessage({
+      action: "FINISH"
+    })
+  }, 1000);
 };
 
 /**
@@ -214,10 +215,19 @@ function start(taskItemId: number) {
   const updateBucket: relationalStore.ValuesBucket = {
     "status": TaskItemStatus.UPLOADING,
   };
-  let predicates = new relationalStore.RdbPredicates('task_item');
+  let predicates = new relationalStore.RdbPredicates(TABLE_NAME);
   predicates.equalTo("id", taskItemId)
   try {
     db.store?.updateSync(updateBucket, predicates);
+    console.log(`${taskItemId}已修改为UPLOADING`);
+    emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {
+      data: {
+        id: taskItemId,
+        action: 'START',
+        uploadedSize: 0,
+        reason: ''
+      }
+    });
   } catch (err) {
     console.error(`task success failed, code is ${err.code},message is ${err.message}`);
   }
@@ -229,7 +239,7 @@ function success(taskItemId: number) {
     "failed_reason": "",
     "uploaded_at": Math.floor(Date.now() / 1000)
   };
-  let predicates = new relationalStore.RdbPredicates('task_item');
+  let predicates = new relationalStore.RdbPredicates(TABLE_NAME);
   predicates.equalTo("id", taskItemId)
   try {
     db.store?.updateSync(updateBucket, predicates);
@@ -243,7 +253,7 @@ function fail(taskItemId: number, reason: string) {
     "status": TaskItemStatus.FAIL,
     "failed_reason": reason
   };
-  let predicates = new relationalStore.RdbPredicates('task_item');
+  let predicates = new relationalStore.RdbPredicates(TABLE_NAME);
   predicates.equalTo("id", taskItemId)
   try {
     db.store?.updateSync(updateBucket, predicates);
@@ -256,7 +266,7 @@ function updateProgress(taskItemId: number, uploadedSize: number) {
   const updateBucket: relationalStore.ValuesBucket = {
     "uploaded_size": uploadedSize,
   };
-  let predicates = new relationalStore.RdbPredicates('task_item');
+  let predicates = new relationalStore.RdbPredicates(TABLE_NAME);
   predicates.equalTo("id", taskItemId)
   try {
     db.store?.updateSync(updateBucket, predicates);
@@ -271,7 +281,7 @@ function updateSize(taskItemId: number, size: number, videoSize: number) {
     "video_size": videoSize,
     "uploaded_at": Math.floor(Date.now() / 1000)
   };
-  let predicates = new relationalStore.RdbPredicates('task_item');
+  let predicates = new relationalStore.RdbPredicates(TABLE_NAME);
   predicates.equalTo("id", taskItemId)
   try {
     db.store?.updateSync(updateBucket, predicates);
@@ -306,11 +316,15 @@ function getBase64Auth(username: string, password: string): string {
 }
 
 function getWaitList(offset: number = 1, limit: number = 100): relationalStore.ResultSet | null {
-  const SQL = `SELECT * FROM task_item WHERE status IN (?, ?, ?) ORDER BY id ASC LIMIT ?, ?`;
+  const SQL = `SELECT * FROM task_items WHERE status IN (1,3,4) ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`;
+  // const SQL = `SELECT * FROM task_items`;
+  // console.log(`SELECT * FROM ${TABLE_NAME} WHERE status IN (${TaskItemStatus.WAIT}, ${TaskItemStatus.UPLOADING}, ${TaskItemStatus.FAIL}) ORDER BY id ASC LIMIT ${limit} OFFSET ${offset}`)
   try {
-    const rs = DB.getInstance().store?.querySqlSync(SQL,
-      [TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, TaskItemStatus.FAIL, offset, limit]);
+    const rs = db.store?.querySqlSync(SQL);
+    // const rs = db.store?.querySqlSync(SQL);
     if (rs === undefined || rs.rowCount <= 0) {
+      rs?.close();
+      console.log(`查询结果是undefine或者返回结果数：${rs?.rowCount}`);
       return null;
     }
     return rs;
@@ -353,6 +367,7 @@ async function upload(context: common.Context, taskItemId: number, serverBaseUrl
     if (existsRR === 1) {
       // 已经上传完成
       success(taskItemId);
+      deleteFile(imageUri);
       emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {
         data: {
           id: taskItemId,
@@ -361,11 +376,12 @@ async function upload(context: common.Context, taskItemId: number, serverBaseUrl
           reason: ''
         }
       });
-      return false;
+      return true;
     }
   } catch (e) {
     console.error(`rcp请求报错：${e.code}, ${e.message}`);
     fail(taskItemId, e.message);
+    deleteFile(imageUri);
     emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {
       data: {
         id: taskItemId,
@@ -438,20 +454,25 @@ async function upload(context: common.Context, taskItemId: number, serverBaseUrl
   } catch (error) {
     let err: BusinessError = error as BusinessError;
     console.error(`创建上传任务失败： ${srcImageUri} => ${remoteUri}, code is ${err.code}, message is ${err.message}`);
+    fail(taskItemId, err.message);
+    deleteFile(imageUri);
+    FINISH ++;
+    emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {
+      data: {
+        id: taskItemId,
+        action: 'FAIL',
+        uploadedSize: size,
+        reason: err.message
+      }
+    });
     return false;
   }
   return true;
 }
 
-/**
- * 1。 检查文件是否存在，不存在则给主线程报错，主线程将该文件重新处理后放入队列继续
- * 2. 上传文件
- * 3. 上传文件过程中更新进度（修改数据库）
- * 4. 上传完成后删除临时文件
- * 5. 修改数据库状态
- */
 async function doTask(uploadItem: TaskItemSendable): Promise<boolean> {
   const context: common.Context = sendableContextManager.convertToContext(uploadItem.sendableContext);
+  // console.log(`数据库路径：${context.databaseDir}，缓存路径：${context.cacheDir}`)
   await DB.init(context);
   updateSerConfig(uploadItem.serverBaseUrl, uploadItem.serverUsername, uploadItem.serverPassword);
   const filesDir: string = context.cacheDir;
@@ -459,30 +480,24 @@ async function doTask(uploadItem: TaskItemSendable): Promise<boolean> {
   // 查找数据
   const resultSet = getWaitList(uploadItem.offset, uploadItem.limit);
   if (resultSet === null) {
+    console.log(`子线程无法查询到待备份列表`);
     return false;
   }
-  TOTAL = resultSet.rowCount;
+  // TOTAL = resultSet.rowCount;
   while (resultSet.goToNextRow()) {
       // 先复制文件
     const taskItemId = resultSet.getLong(resultSet.getColumnIndex('id'));
+    console.log(`${taskItemId} 开始上传`);
     const uri: string = resultSet.getString(resultSet.getColumnIndex('uri'));
     const imageUri: string = resultSet.getString(resultSet.getColumnIndex('file_uri'));
     const name: string = resultSet.getString(resultSet.getColumnIndex('name'));
     let remoteUri: string = resultSet.getString(resultSet.getColumnIndex('remote_uri'));
     const videoUri: string = resultSet.getString(resultSet.getColumnIndex('video_uri'));
-    let videoRemoteUri: string = resultSet.getString(resultSet.getColumnIndex('video_remote_uri'));
+    let videoRemoteUri: string = resultSet.getString(resultSet.getColumnIndex('remote_video_uri'));
     const subType = resultSet.getLong(resultSet.getColumnIndex('sub_type'));
     const size = resultSet.getLong(resultSet.getColumnIndex('size'));
     try {
       start(taskItemId);
-      emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {
-        data: {
-          id: taskItemId,
-          action: 'START',
-          uploadedSize: 0,
-          reason: ''
-        }
-      });
       const sizeArr = await copyFile(context, taskItemId, subType, size, uri, imageUri, videoUri);
       if (sizeArr === null) {
         // 复制文件失败，跳过
@@ -500,8 +515,13 @@ async function doTask(uploadItem: TaskItemSendable): Promise<boolean> {
     } catch (e) {
       FINISH ++;
       fail(taskItemId, e.message);
+      deleteFile(imageUri);
+      if (subType === photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
+        deleteFile(videoUri);
+      }
     }
   }
+  resultSet.close();
   return true;
 }
 

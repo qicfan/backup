@@ -1,20 +1,16 @@
 import { TaskItem } from "../models/TaskItem";
-import { UploadItemSendable } from "../models/UploadItemSendable";
 import {
   AUTOBackup,
-  ConfigGlobalStatus, LoginStatus, LowBatteryStop, OnlyWIFIBackup, TaskDoing, UploadQueueItem } from "../typing";
+  ConfigGlobalStatus, LoginStatus, TaskDoing } from "../typing";
 import { WorkerPool } from "./workerPool";
 import { BusinessError, emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
-import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { WebDav } from "./webdav";
 import { IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
-import { checkBattery, checkWifi, getBatteryLevel, getCurrentNetType } from "./tools";
+import { checkBattery, checkWifi } from "./tools";
 import { Config } from "../models/Config";
-import { connection } from "@kit.NetworkKit";
-import { TaskItemQueue } from "../common/TaskItemQueue";
 import { checkPermissions } from "./permission";
-import { common, UIAbility } from "@kit.AbilityKit";
+import { common, Context } from "@kit.AbilityKit";
 
 export class TaskUpload {
   uploadWorkerPool: WorkerPool = new WorkerPool("entry/ets/workers/TaskWorker.ets")
@@ -92,14 +88,14 @@ export class TaskUpload {
     return true;
   }
 
-  async start(preTotal: number) {
+  async start(ctx: Context, preTotal: number) {
     if (this.global.processId > 0) return false;
     if (!(await this.canStart())) return false;
     console.log(`taskUpload 任务开始执行...`)
     this.global.processId = 1;
     this.global.preTotal = preTotal;
     emitter.once(Global.STOP_TASK_EVENT, () => this.stop());
-    this.uploadWorkerPool.execute(getContext(), preTotal);
+    this.uploadWorkerPool.execute(ctx, preTotal);
     return true;
   }
 
@@ -156,6 +152,7 @@ export class TaskUpload {
   }
 
   async startCreateTask(ctx: Context): Promise<boolean> {
+    console.log(`数据库路径：${ctx.databaseDir}，缓存路径：${ctx.cacheDir}`)
     if (!(await this.canCreateTask())) {
       return false;
     }
@@ -172,7 +169,7 @@ export class TaskUpload {
     } finally {
       if (this.config.auto === AUTOBackup.YES) {
         // 触发任务执行
-        this.start(TaskItem.getWaitCount());
+        this.start(ctx, TaskItem.getWaitCount());
       }
     }
     return exists;

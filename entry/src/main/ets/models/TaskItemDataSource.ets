@@ -86,16 +86,7 @@ export class WaitTaskItemDataSource extends BasicDataSource {
   }
 
   public totalCount(): number {
-    if (this.isGetedTotal) {
-      return this.total;
-    }
-    this.total = TaskItem.getWaitCount();
-    this.isGetedTotal = true;
-    return this.total;
-  }
-
-  public progress(currentSuccess: number, currentFailed: number) {
-    return Math.floor((currentSuccess + currentFailed) / this.totalCount() * 100)
+    return this.dataArray.length;
   }
 
   public currentCount(): number {
@@ -130,16 +121,9 @@ export class WaitTaskItemDataSource extends BasicDataSource {
 
 export class SucTaskItemDataSource extends BasicDataSource {
   dataArray: TaskItem[] = [];
-  private total: number = 0;
-  private isGetedTotal: boolean = false;
 
   public totalCount(): number {
-    if (this.isGetedTotal) {
-      return this.total;
-    }
-    this.total = TaskItem.getSuccessCount();
-    this.isGetedTotal = true;
-    return this.total;
+    return this.dataArray.length;
   }
 
   public progress(currentSuccess: number, currentFailed: number) {
@@ -156,7 +140,6 @@ export class SucTaskItemDataSource extends BasicDataSource {
 
   public clearData() {
     this.dataArray = [];
-    this.isGetedTotal = false;
   }
 
   public pushData(data: TaskItem): void {
