@@ -46,10 +46,10 @@ export struct SucList {
   }
 
   onRefresh(direction: string) {
-    if (this.global.processId > 0) {
-      this.isRefreshing = false;
-      return ;
-    }
+    // if (this.global.processId > 0) {
+    //   this.isRefreshing = false;
+    //   return ;
+    // }
     if (direction === 'pull') {
       this.getList(1).then(() => {
         this.isRefreshing = false;

@@ -198,7 +198,6 @@ export class Photos {
       try {
         await photoAccessHelper.MediaAssetManager.requestImageData(ctx, asset, requestOptions, {
           onDataPrepared: (data: ArrayBuffer) => {
-            console.log('f');
             if (data === undefined) {
               console.error("读取图片数据出错，请检查该图片是否存在或重试")
               resolve("读取图片数据出错，请检查该图片是否存在或重试");

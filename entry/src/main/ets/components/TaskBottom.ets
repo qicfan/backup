@@ -114,7 +114,7 @@ export struct TaskBottom {
           }
         })
         .onClick(() => {
-          if (this.total <= 0) return;
+          // if (this.total <= 0) return;
           if (this.global.processId > 0) {
             this.stopTask();
           } else {

@@ -17,6 +17,7 @@ export struct TaskItemComponent {
   @Local thumbnail: PixelMap | null = null;
   @Local winBP: WinBreakpoint =
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
+  @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local imageTypeRes: string = "";
   @Local imageStatusIcon: string = "";
   @Local progress: number = 0;
@@ -53,7 +54,7 @@ export struct TaskItemComponent {
     if (this.taskItem.status !== TaskItemStatus.SUCCESS) {
       emitter.on(Global.UPDATE_TASK_ITEM_EVENT + '_' + this.taskItem.id, async (data) => {
         if (!this.taskItem) return;
-        console.log(`收到taskitem update event: ${JSON.stringify(data)}`);
+        // console.log(`收到taskitem update event: ${JSON.stringify(data)}`);
         if (data.data?.action === "START") {
           this.taskItem.status = TaskItemStatus.UPLOADING;
         }
@@ -119,10 +120,10 @@ export struct TaskItemComponent {
       .opacity(0.5)
       Row() {
         Image($r(this.imageTypeRes)).width(18).height(18)
-        if (this.taskItem && this.taskItem.status !== TaskItemStatus.UPLOADING) {
-          Image($r(this.imageStatusIcon)).width(18).height(18).fillColor(this.statusIconColor[this.taskItem.status])
-        } else {
+        if (this.global.processId > 0 && this.taskItem && this.taskItem.status === TaskItemStatus.UPLOADING) {
           IBestLoading({ loadingSize: 18 })
+        } else {
+          Image($r(this.imageStatusIcon)).width(18).height(18).fillColor(this.statusIconColor[this.taskItem ? this.taskItem.status : TaskItemStatus.WAIT])
         }
       }
       .width('100%')

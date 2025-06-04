@@ -6,15 +6,17 @@ import { Global } from "../models/Global";
 
 // 上传工作线程
 export class UploadWorkerItem {
+  key: string = '';
   isIdle: boolean = true; // 是否空闲
   workerInstance: worker.ThreadWorker | undefined = undefined; // 工作线程实例
   uploadItem: TaskItemSendable | undefined = undefined; // 待上传对象
 
-  init(workerInstance: worker.ThreadWorker) {
+  init(key: string, workerInstance: worker.ThreadWorker) {
+    this.key = key;
     this.workerInstance = workerInstance;
     workerInstance.onmessage = (e: MessageEvents): void => {
       // data：worker线程发送的信息
-      console.log(`收到上传回调消息，结果：${JSON.stringify(e.data)}`)
+      console.log(`收到上传回调消息，结果：${JSON.stringify(e.data)}`);
       let data: WorkerMessage = e.data;
       if (data.action === "FINISH") {
         this.destroy();
@@ -22,7 +24,9 @@ export class UploadWorkerItem {
     }
     // 在调用terminate后，执行回调onexit
     workerInstance.onexit = async () => {
-      console.log("main thread terminate");
+      // console.log("main thread terminate");
+      this.workerInstance = undefined;
+      this.resetProp();
     }
     workerInstance.onerror = (err: ErrorEvent) => {
       console.error("main error message " + err.message);
@@ -106,6 +110,7 @@ export class WorkerPool {
         if (this.workerItems[i].isIdle) idle ++;
       }
       this.current = this.max - idle;
+      console.log(`当前运行中的线程：${this.current}`);
       if (this.current > 0) return ;
       Global.getInstance().processId = 0;
       console.log(`结束worker pool定时任务`);
@@ -116,10 +121,10 @@ export class WorkerPool {
   }
 
   newItem(): UploadWorkerItem {
-    const item = new UploadWorkerItem();
-    item.init(new worker.ThreadWorker(this.workerFileUri));
-    this.workerItems.push(item);
     this.current += 1;
+    const item = new UploadWorkerItem();
+    item.init(this.current + '', new worker.ThreadWorker(this.workerFileUri));
+    this.workerItems.push(item);
     return item;
   }
 

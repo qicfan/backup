@@ -152,7 +152,6 @@ export class TaskUpload {
   }
 
   async startCreateTask(ctx: Context): Promise<boolean> {
-    console.log(`数据库路径：${ctx.databaseDir}，缓存路径：${ctx.cacheDir}`)
     if (!(await this.canCreateTask())) {
       return false;
     }

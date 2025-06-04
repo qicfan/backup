@@ -1,7 +1,7 @@
 import { ErrorEvent, MessageEvents, ThreadWorkerGlobalScope, worker } from '@kit.ArkTS';
 import { common, sendableContextManager } from '@kit.AbilityKit';
 import { BusinessError, emitter, request } from '@kit.BasicServicesKit';
-import { base64Encode, copyImg2Sandbox, deleteFile, fileSize, getMimeTypeFromExtension, strip } from '../utils/tools';
+import { base64Encode, deleteFile, fileSize, getMimeTypeFromExtension, strip } from '../utils/tools';
 import { RequestReturn } from '../utils/webdav';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { SERVER_AUTH_FAILED_EVENT, TaskItemStatus } from '../typing';
@@ -11,8 +11,7 @@ import { Global } from '../models/Global';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { Photos } from '../utils/photos';
 import { TaskItemSendable } from '../models/TaskItemSendable';
-import { fileIo } from '@kit.CoreFileKit';
-import image from '@ohos.multimedia.image';
+
 
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
 const TABLE_NAME = "task_items";
@@ -31,11 +30,14 @@ workerPort.onmessage = (event: MessageEvents) => {
   doTask(event.data).then(() => {});
   const intervalHandlerId = setInterval(() => {
     // console.log(`定时检查子线程任务状态：总计：${TOTAL}， 已完成：${FINISH}`)
-    if (FINISH < TOTAL) return;
-    clearInterval(intervalHandlerId);
+    if (FINISH < TOTAL) {
+      console.log(`${FINISH} / ${TOTAL}`)
+      return;
+    }
     workerPort.postMessage({
       action: "FINISH"
     })
+    clearInterval(intervalHandlerId);
   }, 1000);
 };
 
@@ -100,7 +102,7 @@ async function mkRemotePath(remoteUri: string, server: string, backupRootPath: s
       continue
     } else {
       // 创建目录失败
-      console.error(`创建目录失败：${currentPath}`);
+      console.error(`创建目录 ${currentPath} 失败：${rr.message}`);
       return false;
     }
   }
@@ -221,7 +223,7 @@ function start(taskItemId: number) {
   predicates.equalTo("id", taskItemId)
   try {
     db.store?.updateSync(updateBucket, predicates);
-    console.log(`${taskItemId}已修改为UPLOADING`);
+    // console.log(`${taskItemId}已修改为UPLOADING`);
     emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {
       data: {
         id: taskItemId,
@@ -245,6 +247,7 @@ function success(taskItemId: number) {
   predicates.equalTo("id", taskItemId)
   try {
     db.store?.updateSync(updateBucket, predicates);
+    // console.log(`${taskItemId} 已备份.`)
   } catch (err) {
     console.error(`task success failed, code is ${err.code},message is ${err.message}`);
   }
@@ -378,6 +381,7 @@ async function upload(context: common.Context, taskItemId: number, serverBaseUrl
       // 已经上传完成
       success(taskItemId);
       deleteFile(imageUri);
+      FINISH ++;
       emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {
         data: {
           id: taskItemId,
@@ -392,6 +396,7 @@ async function upload(context: common.Context, taskItemId: number, serverBaseUrl
     console.error(`rcp请求报错：${e.code}, ${e.message}`);
     fail(taskItemId, e.message);
     deleteFile(imageUri);
+    FINISH ++;
     emitter.emit(Global.UPDATE_TASK_ITEM_EVENT + '_' + taskItemId, {
       data: {
         id: taskItemId,
@@ -490,6 +495,7 @@ async function doTask(uploadItem: TaskItemSendable): Promise<boolean> {
   // 查找数据
   const resultSet = getWaitList(uploadItem.offset, uploadItem.limit);
   if (resultSet === null) {
+    FINISH = TOTAL;
     console.log(`子线程无法查询到待备份列表`);
     return false;
   }
@@ -497,7 +503,7 @@ async function doTask(uploadItem: TaskItemSendable): Promise<boolean> {
   while (resultSet.goToNextRow()) {
       // 先复制文件
     const taskItemId = resultSet.getLong(resultSet.getColumnIndex('id'));
-    console.log(`${taskItemId} 开始上传`);
+    // console.log(`${taskItemId} 开始上传`);
     const uri: string = resultSet.getString(resultSet.getColumnIndex('uri'));
     const imageUri: string = resultSet.getString(resultSet.getColumnIndex('file_uri'));
     const name: string = resultSet.getString(resultSet.getColumnIndex('name'));
