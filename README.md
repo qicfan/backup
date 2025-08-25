@@ -1,6 +1,8 @@
 ## 鸿蒙5.0 鸿蒙Next(HarmonyOS Next) 相册备份 使用webdav协议备份到NAS
 
 ## 上架失败：应用商店觉得功能单一，用户体验不好。
+## 测试版本链接：https://appgallery.huawei.com/link/invite-test-wap?taskId=cd1d1a840df25d887bc6676cea7b8308
+## 基于5.0.4(API 16)，请确保您设备的系统版本大于等于该版本
 
 ### v1.0.0
 - [x] 使用关键资产存储服务器、用户名、密码
