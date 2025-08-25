@@ -23,7 +23,8 @@ export struct TaskBottom {
   }
 
   async startTask() {
-    (TaskUpload.getInstance()).start(getContext(this), this.total);
+    const total = TaskItem.getWaitCount();
+    (TaskUpload.getInstance()).start(getContext(this), total);
     // 定时更新进度
     this.handleId = setInterval(() => {
       // console.log(`task bottom 定期检查进度`)

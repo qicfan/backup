@@ -1,8 +1,7 @@
-import { IBestDialog, IBestLoading, IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
+import { IBestDialog, IBestLoading, IBestNotify } from "@ibestservices/ibest-ui-v2";
 import { BusinessError, deviceInfo } from "@kit.BasicServicesKit"
 import { SafeArea } from "../utils/safeArea";
-import { AppStorageV2, EditableLeftIconType, EditableTitleBar, EditableTitleBarItem,
-  EditableTitleBarMenuItem } from "@kit.ArkUI";
+import { AppStorageV2, EditableLeftIconType, EditableTitleBar, EditableTitleBarMenuItem } from "@kit.ArkUI";
 import { RequestReturn, WebDav, WebDavResource } from "../utils/webdav";
 import { ServerConfig } from "../models/Server";
 import { Dialog } from "../utils/dialog";
@@ -19,45 +18,18 @@ export struct FolderSelectDialog {
   @Local safeArea: SafeArea = AppStorageV2.connect(SafeArea, () => SafeArea.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local dirList: WebDavResource[] = [];
-  @Local path: string[] = []
+  @Local path: string = ""
   @Local init: boolean = true;
-  private deviceName = deviceInfo.marketName;
 
-  aboutToAppear() {
-    let path = this.rootPath;
-    path = path.replace('/' + this.deviceName + '/', '')
-    // 如果为空则设置为/
-    if (path === "") {
-      this.path = ['/']
-    } else {
-      this.path = path.split('/')
-    }
-    if (this.path.length >=2 && this.path[0] == "" && this.path[1] == "") {
-      this.path.shift();
-    }
-    this.webdav.getDirs(this.path.join('/')).then((rr) => {
-      this.dirList = rr.data ? rr.data : [];
-      this.init = false;
-    }).catch(() => {
-      this.init = false;
-    })
-  }
-
-  changeDir(href: string) {
-    let path = href.split('/');
-    if (path[path.length - 1] === '') {
-      path.pop()
-    }
-    this.path = path;
-    this.webdav.getDirs(href).then((rr) => {
-      this.dirList = rr.data ? rr.data : [];
-    }).catch(() => {
-    })
-
-  }
   @Local newDirName: string = ""
   @Local formInputError: boolean = false
   @Local newDirDialog: boolean = false;
+
+  private deviceName = deviceInfo.marketName;
+
+  menu: EditableTitleBarMenuItem = {
+    value: $r('sys.media.ohos_ic_public_add'), isEnabled: true, action: () => {this.newDirDialog = true;}
+  }
 
   @Builder formInputContain() {
     Column({ space: 20 }) {
@@ -76,8 +48,32 @@ export struct FolderSelectDialog {
     }.padding(20)
   }
 
-  menu: EditableTitleBarMenuItem = {
-    value: $r('sys.media.ohos_ic_public_add'), isEnabled: true, action: () => {this.newDirDialog = true;}
+  aboutToAppear() {
+    let path = this.rootPath;
+    path = path.replace(this.deviceName + '/', '')
+    this.path = path
+    console.log(`已选路径：${this.path}`)
+    this.webdav.getDirs(this.path).then((rr) => {
+      this.dirList = rr.data ? rr.data : [];
+      this.init = false;
+    }).catch(() => {
+      this.init = false;
+    })
+  }
+
+  changeDir(href: string) {
+    // let path = href.split('/');
+    // if (path[path.length - 1] === '') {
+    //   path.pop()
+    // }
+    this.path = href;
+    if (!this.path.endsWith('/')) {
+      this.path += '/'
+    }
+    this.webdav.getDirs(href).then((rr) => {
+      this.dirList = rr.data ? rr.data : [];
+    }).catch(() => {
+    })
   }
 
   onCancel() {
@@ -85,14 +81,14 @@ export struct FolderSelectDialog {
       Dialog.closeDialog();
       return true;
     } else {
-      this.path.pop()
-      this.changeDir(this.path.join('/'))
+      this.path = this.rootPath
+      this.changeDir(this.path)
       return false;
     }
   }
 
   onSave() {
-    let path = this.path.join('/')
+    let path = this.path
     if (!path.endsWith('/')) {
       path += '/';
     }
@@ -182,11 +178,11 @@ export struct FolderSelectDialog {
 
 
       Column() {
-        if (this.path.join('/') == "/") {
-          Text(`已选路径：${this.path.join('/')}${this.deviceName}`)
+        if (this.path == "/" || this.path == "") {
+          Text(`已选路径：/${this.deviceName}`)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
         } else {
-          Text(`已选路径：${this.path.join('/')}/${this.deviceName}`)
+          Text(`已选路径：${this.path}/${this.deviceName}`)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
         }
       }
@@ -213,7 +209,11 @@ export struct FolderSelectDialog {
           }
           const valueLength = this.newDirName.trim().length
           this.formInputError = !valueLength
-          let path = this.path.join('/') + '/' + this.newDirName + '/'
+          let path = this.path
+          if (!path.endsWith('/')) {
+            path += '/'
+          }
+          path += this.newDirName + '/'
           try {
             this.webdav.mkDir(path).then((rs) => {
               if (rs.success) {

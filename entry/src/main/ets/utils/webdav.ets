@@ -44,7 +44,7 @@ export class WebDav {
     this.server = serverConfig;
     this.session?.close()
     this.session = rcp.createSession({
-      baseAddress: this.server.server,
+      // baseAddress: this.server.server,
       headers: { "Accept": "text/plain,application/xml" },
       requestConfiguration: {
         transfer: {
@@ -130,12 +130,15 @@ export class WebDav {
 
   // 验证服务器和验证方式是否可用
   public async valid() {
-    const req = new rcp.Request('/', "PROPFIND", { "Depth": "0" });
+    let url = this.server ? this.server.getRealUrl('/') : "/"
+    console.log(`valid url: ${url}`)
+    const req = new rcp.Request(url, "PROPFIND", { "Depth": "0" });
     return await this.request(req);
   }
 
   // 读取目录下的所有文件夹
   async getDirs(path: string = '/') {
+    console.log('get dirs')
     const body = "<?xml version=\"1.0\"?>\n" +
       "<d:propfind xmlns:d=\"DAV:\">\n" +
       "  <d:prop>\n" +
@@ -143,7 +146,10 @@ export class WebDav {
       "    <d:displayname/>\n" +
       "  </d:prop>\n" +
       "</d:propfind>"
-    const req = new rcp.Request(path, "PROPFIND", { "Depth": "1" }, body);
+    console.log('get dirs: make real url')
+    let url = this.server ? this.server.getRealUrl(path) : path
+    console.log("get dir url: " + url)
+    const req = new rcp.Request(url, "PROPFIND", { "Depth": "1" }, body);
     const rr = await this.request(req);
     if (rr.statusCode === 200) {
       const items = this.parseXml(rr.body ? rr.body : "");
@@ -163,7 +169,9 @@ export class WebDav {
   // 是否存在
   async exists(path: string, size: number) {
     console.log(`查询${path}是否存在`)
-    const req = new rcp.Request(path, "PROPFIND", { "Depth": "0" });
+    let url = this.server ? this.server.getRealUrl(path) : "/"
+    console.log("exists url: " + url)
+    const req = new rcp.Request(url, "PROPFIND", { "Depth": "0" });
     const rr = await this.request(req);
     // 不存在
     if (!rr.success) {
@@ -189,7 +197,9 @@ export class WebDav {
 
   async pathExists(path: string) {
     console.log(`查询${path}是否存在`)
-    const req = new rcp.Request(path, "PROPFIND", { "Depth": "0" });
+    let url = this.server ? this.server.getRealUrl(path) : "/"
+    console.log("path exists url: " + url)
+    const req = new rcp.Request(url, "PROPFIND", { "Depth": "0" });
     const rr = await this.request(req);
     console.warn(JSON.stringify(rr));
     console.log(`${path} => ${rr.success}`)
@@ -210,45 +220,23 @@ export class WebDav {
       requestReturn.message = "";
       return requestReturn;
     }
-    const req = new rcp.Request(path, "MKCOL");
+    let url = this.server ? this.server.getRealUrl(path) : "/"
+    console.log("mkDir url: " + url)
+    const req = new rcp.Request(url, "MKCOL");
     return await this.request(req);
   }
 
   // 删除文件
   async delete(path: string) {
-    const req = new rcp.Request(path, "DELETE");
+    let url = this.server ? this.server.getRealUrl(path) : "/"
+    console.log("mkDir url: " + url)
+    const req = new rcp.Request(url, "DELETE");
     return await this.request(req);
   }
-
-  // async upload(remoteUri: string, fileStream: fileIo.Stream, size: number,
-  //   progressCallback: (transferredSize: number) => void): Promise<RequestReturn> {
-  //   // 读取文件
-  //   let uploadBuffer = new ArrayBuffer(size);
-  //   await fileStream.read(uploadBuffer, { offset: 0, length: size });
-  //   const customHttpEventsHandler: rcp.HttpEventsHandler = {
-  //     onUploadProgress: (totalSize: number, transferredSize: number) => {
-  //       progressCallback(transferredSize);
-  //     }
-  //   };
-  //   // console.log(`要上传的文件：${taskItem.fileUri}, 远程路径：${taskItem.remoteUri}, url: ${url}`)
-  //   const req = new rcp.Request(remoteUri, "PUT", {}, uploadBuffer, {}, {},
-  //     { tracing: { httpEventsHandler: customHttpEventsHandler } });
-  //   const rr = await this.request(req);
-  //   if (rr.success) {
-  //     console.info("上传成功:" + (remoteUri) + ', ' + rr.statusCode);
-  //     uploadBuffer = new ArrayBuffer(0);
-  //   } else {
-  //     rr.message = "上传失败，服务器返回状态: " + rr.statusCode + "，错误信息：" + rr.message;
-  //     console.error(rr.message);
-  //     uploadBuffer = new ArrayBuffer(0);
-  //   }
-  //   return rr
-  // }
 
   getBase64Auth(): string {
     return base64Encode(`${this.server?.username}:${this.server?.password}`)
   }
-
 
   // 使用系统上传方法进行上传，看是否能解决大文件上传问题。
   uploadBySys(context: Context, name: string, remoteUri: string, filePath: string,

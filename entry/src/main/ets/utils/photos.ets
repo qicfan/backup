@@ -1,4 +1,4 @@
-import { PhotoItem, TaskItemStatus } from "../typing";
+import { TaskItemStatus } from "../typing";
 import { dataSharePredicates } from "@kit.ArkData";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { BusinessError } from "@kit.BasicServicesKit";
@@ -178,54 +178,133 @@ export class Photos {
 
   static async saveImage(ctx: Context, uri: string, imageUri: string): Promise<string> {
     return new Promise(async (resolve, reject) => {
-      let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
-      predicates.equalTo(photoAccessHelper.PhotoKeys.PHOTO_TYPE, photoAccessHelper.PhotoType.IMAGE).and().equalTo('uri', uri);
-      let fetchOptions: photoAccessHelper.FetchOptions = {
-        fetchColumns: [],
-        predicates: predicates
-      };
-      let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx);
-      let assetResult: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> = await phAccessHelper.getAssets(fetchOptions);
-      if (!assetResult || assetResult.getCount() <= 0) {
-        console.error("无法查询到图片数据")
-        resolve("无法查询到图片数据");
-        return;
-      }
-      let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
-      let requestOptions: photoAccessHelper.RequestOptions = {
-        deliveryMode: photoAccessHelper.DeliveryMode.HIGH_QUALITY_MODE,
-      }
-      try {
-        await photoAccessHelper.MediaAssetManager.requestImageData(ctx, asset, requestOptions, {
-          onDataPrepared: (data: ArrayBuffer) => {
-            if (data === undefined) {
-              console.error("读取图片数据出错，请检查该图片是否存在或重试")
-              resolve("读取图片数据出错，请检查该图片是否存在或重试");
-              return ;
-            }
+      let file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+      console.info('file fd: ' + file.fd);
+      //根据文件fd创建imagSource
+      const imageSource: image.ImageSource = image.createImageSource(file.fd);
+      const keys = [
+      // 基础信息
+        image.PropertyKey.IMAGE_DESCRIPTION,
+        image.PropertyKey.MAKE,
+        image.PropertyKey.MODEL,
+        image.PropertyKey.ORIENTATION,
+        image.PropertyKey.X_RESOLUTION,
+        image.PropertyKey.Y_RESOLUTION,
+        image.PropertyKey.RESOLUTION_UNIT,
+        image.PropertyKey.SOFTWARE,
+        image.PropertyKey.DATE_TIME,
+        image.PropertyKey.OFFSET_TIME,
 
-            try {
-              // 写入文件
-              const destFile = fileIo.openSync(imageUri, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
-              try {
-                fileIo.statSync(destFile.fd);
-                // fileIo.unlinkSync(imageUri);
-              } catch (err) {
-                console.error(`查询文件状态出错, error code is ${err.code}, message is ${err.message}`);
-              }
-              fileIo.writeSync(destFile.fd, data);
-              fileIo.closeSync(destFile.fd);
-              resolve('success');
-            } catch (err) {
-              console.error(`写入图片文件出错, error code is ${err.code}, message is ${err.message}`);
-              reject(err)
-            }
-          }
-        });
-      } catch (err) {
-        console.error(`failed to request image, error code is ${err.code}, message is ${err.message}`);
-        reject(err)
-      }
+        // GPS
+        image.PropertyKey.GPS_VERSION_ID,
+        image.PropertyKey.GPS_LATITUDE_REF,
+        image.PropertyKey.GPS_LATITUDE,
+        image.PropertyKey.GPS_LONGITUDE_REF,
+        image.PropertyKey.GPS_LONGITUDE,
+        image.PropertyKey.GPS_ALTITUDE_REF,
+        image.PropertyKey.GPS_ALTITUDE,
+        image.PropertyKey.GPS_STATUS,
+        image.PropertyKey.GPS_MAP_DATUM,
+
+        // 拍摄参数
+        image.PropertyKey.EXPOSURE_TIME,
+        image.PropertyKey.F_NUMBER,
+        image.PropertyKey.EXPOSURE_PROGRAM,
+        image.PropertyKey.ISO_SPEED_RATINGS,
+        image.PropertyKey.SENSITIVITY_TYPE,
+        image.PropertyKey.EXIF_VERSION,
+        image.PropertyKey.DATE_TIME_ORIGINAL,
+        image.PropertyKey.DATE_TIME_DIGITIZED,
+        image.PropertyKey.SHUTTER_SPEED,
+        image.PropertyKey.APERTURE_VALUE,
+        image.PropertyKey.EXPOSURE_BIAS_VALUE,
+        image.PropertyKey.MAX_APERTURE_VALUE,
+        image.PropertyKey.METERING_MODE,
+        image.PropertyKey.LIGHT_SOURCE,
+        image.PropertyKey.FLASH,
+        image.PropertyKey.FOCAL_LENGTH,
+        image.PropertyKey.COLOR_SPACE,
+        image.PropertyKey.PIXEL_X_DIMENSION,
+        image.PropertyKey.PIXEL_Y_DIMENSION,
+        image.PropertyKey.WHITE_BALANCE,
+        image.PropertyKey.DIGITAL_ZOOM_RATIO,
+        image.PropertyKey.SCENE_CAPTURE_TYPE,
+        image.PropertyKey.GAIN_CONTROL,
+        image.PropertyKey.CONTRAST,
+        image.PropertyKey.SATURATION,
+        image.PropertyKey.SHARPNESS,
+        image.PropertyKey.BODY_SERIAL_NUMBER,
+        image.PropertyKey.LENS_SPECIFICATION
+      ]
+      imageSource.getImageProperties(keys).then((data) => {
+        console.info(JSON.stringify(data));
+      }).catch((err: BusinessError) => {
+        console.error(JSON.stringify(err));
+      });
+      let info = imageSource.getImageInfoSync(0)
+      // 写入文件
+      let newFile = fileIo.openSync(imageUri, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
+      const imagePackerApi = image.createImagePacker();
+      let packOpts : image.PackingOption = { format:info.mimeType, quality: 100, needsPackProperties: true, desiredDynamicRange: image.PackingDynamicRange.AUTO };
+      imagePackerApi.packToFile(imageSource, newFile.fd, packOpts).then(() => {
+        resolve('success')
+      }).catch((error : BusinessError) => {
+        console.error('Failed to pack the image. And the error is: ' + error);
+        reject(error)
+      }).finally(()=>{
+        fileIo.closeSync(file.fd);
+        fileIo.closeSync(newFile.fd)
+      })
+      // 关闭文件
+      // let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
+      // predicates.equalTo(photoAccessHelper.PhotoKeys.PHOTO_TYPE, photoAccessHelper.PhotoType.IMAGE).and().equalTo('uri', uri);
+      // let fetchOptions: photoAccessHelper.FetchOptions = {
+      //   fetchColumns: [],
+      //   predicates: predicates
+      // };
+      // let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx);
+      // let assetResult: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> = await phAccessHelper.getAssets(fetchOptions);
+      // if (!assetResult || assetResult.getCount() <= 0) {
+      //   console.error("无法查询到图片数据")
+      //   resolve("无法查询到图片数据");
+      //   return;
+      // }
+      // let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
+      // let requestOptions: photoAccessHelper.RequestOptions = {
+      //   deliveryMode: photoAccessHelper.DeliveryMode.HIGH_QUALITY_MODE,
+      //   compatibleMode: photoAccessHelper.CompatibleMode.ORIGINAL_FORMAT_MODE
+      // }
+      // try {
+      //   await photoAccessHelper.MediaAssetManager.requestImageData(ctx, asset, requestOptions, {
+      //     onDataPrepared: (data: ArrayBuffer) => {
+      //       if (data === undefined) {
+      //         console.error("读取图片数据出错，请检查该图片是否存在或重试")
+      //         resolve("读取图片数据出错，请检查该图片是否存在或重试");
+      //         return ;
+      //       }
+      //
+      //       try {
+      //         // 写入文件
+      //         const destFile = fileIo.openSync(imageUri, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+      //         try {
+      //           fileIo.statSync(destFile.fd);
+      //           // fileIo.unlinkSync(imageUri);
+      //         } catch (err) {
+      //           console.error(`查询文件状态出错, error code is ${err.code}, message is ${err.message}`);
+      //         }
+      //         fileIo.writeSync(destFile.fd, data);
+      //         fileIo.closeSync(destFile.fd);
+      //         resolve('success');
+      //       } catch (err) {
+      //         console.error(`写入图片文件出错, error code is ${err.code}, message is ${err.message}`);
+      //         reject(err)
+      //       }
+      //     }
+      //   });
+      // } catch (err) {
+      //   console.error(`failed to request image, error code is ${err.code}, message is ${err.message}`);
+      //   reject(err)
+      // }
     });
   }
 

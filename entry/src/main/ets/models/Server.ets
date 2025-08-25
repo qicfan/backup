@@ -1,5 +1,5 @@
 import { asset } from '@kit.AssetStoreKit';
-import { util } from '@kit.ArkTS';
+import { url, util } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
 
 const PASSWORD_ALIAS = "backup_password"
@@ -27,7 +27,9 @@ export class NotFoundServer implements BusinessError {
  */
 @ObservedV2
 export class ServerConfig {
+  @Trace
   server: string = ""
+  @Trace
   username: string = ""
   password: string = ""
 
@@ -120,5 +122,27 @@ export class ServerConfig {
     let query: asset.AssetMap = new Map();
     query.set(asset.Tag.ALIAS, stringToArray(PASSWORD_ALIAS));
     return await asset.remove(query)
+  }
+
+  // 根据path和this.server来拼接成完整的Url
+  // 如果path是决定路径，责解析this.server，只返回主机和端口部分来拼接
+  // 如果是path是相对路径，责拼接到this.server后面
+  getRealUrl(path: string) {
+    let urlObj: url.URL = new url.URL()
+    try {
+      urlObj = url.URL.parseURL(this.server)
+    } catch (e) {
+      console.error(e)
+    }
+    if (path == '/' || path == '') {
+      return this.server
+    }
+    if (path.startsWith('/')) {
+      // 绝对路径
+      return `http://${urlObj.hostname}:${urlObj.port}${path}`
+    } else {
+      // 相对路径
+      return `${this.server}${path}`
+    }
   }
 }

@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<D:multistatus xmlns:D="DAV:">
+    <D:response>
+        <D:href>/dav/QPhotos/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:displayname>QPhotos</D:displayname>
+                <D:getlastmodified>Sun, 24 Aug 2025 12:19:53 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:19:53Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/.dockerenv</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:getetag>"68ab02ba-0"</D:getetag>
+                <D:resourcetype></D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:58Z</D:creationdate>
+                <D:getcontenttype>application/octet-stream</D:getcontenttype>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <checksums xmlns="http://owncloud.org/ns"></checksums>
+                <D:displayname>.dockerenv</D:displayname>
+                <D:getcontentlength>0</D:getcontentlength>
+                <D:getlastmodified>Sun, 24 Aug 2025 12:16:58 GMT</D:getlastmodified>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/QPhotos/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:getlastmodified>Thu, 14 Aug 2025 12:07:31 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-07-07T14:29:44Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>QPhotos</D:displayname>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/bin/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>bin</D:displayname>
+                <D:getlastmodified>Sun, 17 Aug 2025 20:25:41 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:49Z</D:creationdate>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/dev/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:getlastmodified>Sun, 24 Aug 2025 12:59:14 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:59:14Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>dev</D:displayname>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/entrypoint.sh</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:resourcetype></D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:57Z</D:creationdate>
+                <D:getcontenttype>application/octet-stream</D:getcontenttype>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <checksums xmlns="http://owncloud.org/ns"></checksums>
+                <D:displayname>entrypoint.sh</D:displayname>
+                <D:getcontentlength>641</D:getcontentlength>
+                <D:getlastmodified>Mon, 18 Aug 2025 07:29:12 GMT</D:getlastmodified>
+                <D:getetag>"68a2d648-281"</D:getetag>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/etc/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:58Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>etc</D:displayname>
+                <D:getlastmodified>Sun, 24 Aug 2025 12:16:58 GMT</D:getlastmodified>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/home/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>home</D:displayname>
+                <D:getlastmodified>Wed, 08 Jan 2025 12:13:20 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:48Z</D:creationdate>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/lib/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:displayname>lib</D:displayname>
+                <D:getlastmodified>Sun, 17 Aug 2025 20:25:40 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:49Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/media/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:48Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>media</D:displayname>
+                <D:getlastmodified>Wed, 08 Jan 2025 12:13:20 GMT</D:getlastmodified>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/mnt/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:displayname>mnt</D:displayname>
+                <D:getlastmodified>Wed, 08 Jan 2025 12:13:20 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:48Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/opt/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:57Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>opt</D:displayname>
+                <D:getlastmodified>Sun, 17 Aug 2025 20:25:42 GMT</D:getlastmodified>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/proc/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:59:14Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>proc</D:displayname>
+                <D:getlastmodified>Sun, 24 Aug 2025 12:59:14 GMT</D:getlastmodified>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/root/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:48Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>root</D:displayname>
+                <D:getlastmodified>Wed, 08 Jan 2025 12:13:20 GMT</D:getlastmodified>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/run/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:displayname>run</D:displayname>
+                <D:getlastmodified>Wed, 08 Jan 2025 12:13:20 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:48Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/sbin/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:49Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>sbin</D:displayname>
+                <D:getlastmodified>Sun, 17 Aug 2025 20:25:41 GMT</D:getlastmodified>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/srv/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>srv</D:displayname>
+                <D:getlastmodified>Wed, 08 Jan 2025 12:13:20 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:48Z</D:creationdate>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/sys/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:displayname>sys</D:displayname>
+                <D:getlastmodified>Sun, 24 Aug 2025 12:59:14 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:59:14Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/tmp/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:48Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>tmp</D:displayname>
+                <D:getlastmodified>Wed, 08 Jan 2025 12:13:20 GMT</D:getlastmodified>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/usr/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:displayname>usr</D:displayname>
+                <D:getlastmodified>Wed, 08 Jan 2025 12:13:20 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:49Z</D:creationdate>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+    <D:response>
+        <D:href>/dav/QPhotos/var/</D:href>
+        <D:propstat>
+            <D:prop>
+                <D:supportedlock>
+                    <D:lockentry xmlns:D="DAV:">
+                        <D:lockscope>
+                            <D:exclusive/>
+                        </D:lockscope>
+                        <D:locktype>
+                            <D:write/>
+                        </D:locktype>
+                    </D:lockentry>
+                </D:supportedlock>
+                <D:displayname>var</D:displayname>
+                <D:getlastmodified>Sun, 17 Aug 2025 20:25:40 GMT</D:getlastmodified>
+                <D:resourcetype>
+                    <D:collection xmlns:D="DAV:"/>
+                </D:resourcetype>
+                <D:creationdate>2025-08-24T12:16:49Z</D:creationdate>
+            </D:prop>
+            <D:status>HTTP/1.1 200 OK</D:status>
+        </D:propstat>
+    </D:response>
+</D:multistatus>

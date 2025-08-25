@@ -440,7 +440,7 @@ async function upload(context: common.Context, taskItemId: number, serverBaseUrl
     });
     uploadTask.on('fail', (taskStates: Array<request.TaskState>) => {
       // 删除文件
-      deleteFile(imageUri);
+      // deleteFile(imageUri);
       console.info("upOnFail taskState:" + JSON.stringify(taskStates[0]));
       fail(taskItemId, taskStates[0].message);
       FINISH ++;

@@ -5,6 +5,7 @@ import { WebDav } from "../utils/webdav";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 import { LoginStatus } from "../typing";
+import { url } from "@kit.ArkTS";
 
 @ComponentV2
 export struct Login {
@@ -13,7 +14,9 @@ export struct Login {
   @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local addBtnLoading: boolean = false;
-  @Local serverPath: string = ""
+  @Local serverPath: string = "/"
+  @Local serverHost: string = "192.168.1.1"
+  @Local serverPort: string = "5005"
   @Local username: string = ""
   @Local password: string = ""
 
@@ -22,7 +25,7 @@ export struct Login {
   async addServer() {
     this.pop = this.pageInfos.getParamByIndex(1) as boolean;
     // 判断数据是否为空
-    if (this.serverPath === '' || this.username === '' || this.password === '') {
+    if (this.serverHost === '' || this.serverPort === '' || this.serverPath === '' || this.username === '' || this.password === '') {
       IBestNotify.show({
         message: '请输入服务器、用户名、密码。',
         duration: 3000,
@@ -30,8 +33,20 @@ export struct Login {
       })
       return
     }
+    // 路径必须以/结尾
+    if (this.serverPath !== '/' && !this.serverPath.endsWith('/')) {
+      this.serverPath += '/'
+    }
+    // 路径必须以/开头
+    if (this.serverPath !== '/' && !this.serverPath.startsWith('/')) {
+      this.serverPath = '/' + this.serverPath
+    }
     this.addBtnLoading = true
-    this.server.server = this.serverPath;
+    console.log(`${this.serverHost}, ${this.serverPort}, ${this.serverPath}`)
+    this.server.server = `http://${this.serverHost}:${this.serverPort}${this.serverPath}`;
+    // this.server.path = this.serverPath
+    // this.server.host = this.serverHost
+    // this.server.port = this.serverPort
     this.server.username = this.username;
     this.server.password = this.password;
     this.webdav.updateSerConfig(this.server);
@@ -47,7 +62,7 @@ export struct Login {
     }
     // 写入服务器到关键资产
     try {
-      await this.server.addOrUpdateAsset(this.serverPath, this.username, this.password);
+      await this.server.addOrUpdateAsset(this.server.server, this.username, this.password);
       this.addBtnLoading = false
       this.global.loginStatus = LoginStatus.LOGIN;
       this.pageInfos.pop();
@@ -66,6 +81,15 @@ export struct Login {
 
   aboutToAppear(): void {
     // console.log("登录页面加载")
+    if (this.server.server == "") {
+      return
+    }
+    let urlObj = url.URL.parseURL(this.server.server)
+    this.serverHost = urlObj.hostname
+    this.serverPort = urlObj.port
+    this.serverPath = urlObj.pathname
+    this.username = this.server.username
+    this.password = this.server.password
   }
 
   aboutToDisappear(): void {
@@ -77,10 +101,22 @@ export struct Login {
       Scroll() {
         Column() {
           IBestField({
-            value: this.serverPath!!,
-            label: "服务器",
+            value: this.serverHost!!,
+            label: "IP或域名",
             required: true,
-            placeholder: "http://ip:port",
+            placeholder: "192.168.1.1",
+          })
+          IBestField({
+            value: this.serverPort!!,
+            label: "端口",
+            required: true,
+            placeholder: "5005",
+          })
+          IBestField({
+            value: this.serverPath!!,
+            label: "默认路径",
+            required: true,
+            placeholder: "/",
           })
           IBestField({
             value: this.username!!,

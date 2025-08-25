@@ -1,8 +1,8 @@
 import { IBestNotify, IBestPicker, IBestPickerOption, IBestPopup } from "@ibestservices/ibest-ui-v2"
 import { Config } from "../models/Config";
-import { AUTOBackup, BackupType, ConfigGlobalStatus, LowBatteryStop, OnlyWIFIBackup } from "../typing"
+import { AUTOBackup, BackupType, LowBatteryStop, OnlyWIFIBackup } from "../typing"
 import { Cell } from "./Cell"
-import { AppStorageV2, ComponentContent, ComposeTitleBar, EditableLeftIconType, EditableTitleBar } from "@kit.ArkUI";
+import { AppStorageV2, ComponentContent } from "@kit.ArkUI";
 import { Dialog } from "../utils/dialog";
 import { FolderSelectDialog } from "../dialogs/FolderSelectDialog";
 import { ServerConfig } from "../models/Server";
