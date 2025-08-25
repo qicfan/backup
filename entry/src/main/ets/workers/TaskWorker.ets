@@ -1,4 +1,4 @@
-import { ErrorEvent, MessageEvents, ThreadWorkerGlobalScope, worker } from '@kit.ArkTS';
+import { ErrorEvent, MessageEvents, ThreadWorkerGlobalScope, url, worker } from '@kit.ArkTS';
 import { common, sendableContextManager } from '@kit.AbilityKit';
 import { BusinessError, emitter, request } from '@kit.BasicServicesKit';
 import { base64Encode, deleteFile, fileSize, getMimeTypeFromExtension, strip } from '../utils/tools';
@@ -83,16 +83,27 @@ async function updateSerConfig(server: string, username: string, password: strin
   });
 }
 
+function getRealUrl(server: string, backupRootPath: string, path: string) {
+  let base = server + backupRootPath
+  base = strip(base, '/')
+  path = strip(path, '/')
+  if (path == '/' || path == '') {
+    return base
+  }
+  return `${base}/${path}`
+}
+
 async function mkRemotePath(remoteUri: string, server: string, backupRootPath: string): Promise<boolean> {
-  remoteUri = remoteUri.replace(server, "").replace(backupRootPath, "");
-  const dirList: string[] = remoteUri.split('/').filter(part => part.length > 0);
+  remoteUri = strip(remoteUri, '/')
+  const dirList: string[] = remoteUri.split('/')
   dirList.pop();
   // 检查路径是否已经存在
-  let currentPath: string = strip(backupRootPath, '/');
-  const rs = await colExists(currentPath + '/' + dirList.join('/'))
+  let fullPath = getRealUrl(server, backupRootPath, dirList.join('/'))
+  const rs = await colExists(fullPath)
   if (rs) {
     return true;
   }
+  let currentPath = getRealUrl(server, backupRootPath, "/")
   for (let dir of dirList) {
     // 创建目录
     currentPath += `/${dir}`;
@@ -349,12 +360,14 @@ function getWaitList(offset: number = 1, limit: number = 100): relationalStore.R
 }
 
 function getFullRemoteUri(remoteUri: string, hasBaseUri: boolean, server: string, backupRootPath: string) {
+  console.log(remoteUri, server, backupRootPath)
   let url: string = "";
   if (hasBaseUri) {
     url = strip(server, '/')
   }
   const rootPath = strip(backupRootPath, '/');
   url += `${rootPath}/${remoteUri}`;
+  console.log(url)
   return url;
 }
 
@@ -363,8 +376,9 @@ async function upload(context: common.Context, taskItemId: number, serverBaseUrl
 
   // 上传文件
   const srcImageUri: string = imageUri.replace(filesDir, 'internal://cache');
+  let oldRemoteUri = remoteUri
   remoteUri = getFullRemoteUri(remoteUri, true, serverBaseUrl, backupRootPath);
-  const mkRP = await mkRemotePath(remoteUri, serverBaseUrl, backupRootPath);
+  const mkRP = await mkRemotePath(oldRemoteUri, serverBaseUrl, backupRootPath);
   if (!mkRP) {
     fail(taskItemId, "在服务器上创建备份目录失败");
     return false;
@@ -440,7 +454,7 @@ async function upload(context: common.Context, taskItemId: number, serverBaseUrl
     });
     uploadTask.on('fail', (taskStates: Array<request.TaskState>) => {
       // 删除文件
-      // deleteFile(imageUri);
+      deleteFile(imageUri);
       console.info("upOnFail taskState:" + JSON.stringify(taskStates[0]));
       fail(taskItemId, taskStates[0].message);
       FINISH ++;
