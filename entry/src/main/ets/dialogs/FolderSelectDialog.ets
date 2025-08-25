@@ -8,6 +8,8 @@ import { Dialog } from "../utils/dialog";
 import { Config } from "../models/Config";
 import { Global } from "../models/Global";
 import { ConfigGlobalStatus } from "../typing";
+import { strip } from "../utils/tools";
+import { url } from "@kit.ArkTS";
 
 @ComponentV2
 export struct FolderSelectDialog {
@@ -25,7 +27,8 @@ export struct FolderSelectDialog {
   @Local formInputError: boolean = false
   @Local newDirDialog: boolean = false;
 
-  private deviceName = deviceInfo.marketName;
+  private deviceName = encodeURIComponent(deviceInfo.marketName);
+  private basePath: string = ""
 
   menu: EditableTitleBarMenuItem = {
     value: $r('sys.media.ohos_ic_public_add'), isEnabled: true, action: () => {this.newDirDialog = true;}
@@ -49,8 +52,17 @@ export struct FolderSelectDialog {
   }
 
   aboutToAppear() {
+    let urlObj = url.URL.parseURL(this.server.server)
+    this.basePath = urlObj.pathname
     let path = this.rootPath;
-    path = path.replace(this.deviceName + '/', '')
+    path = path.replace(this.basePath, "")
+    path = path.replace('/'+ this.deviceName + '/', '')
+    if (path == '/') {
+      path = ''
+    }
+    if (!path.endsWith('/')) {
+      path += '/'
+    }
     this.path = path
     console.log(`已选路径：${this.path}`)
     this.webdav.getDirs(this.path).then((rr) => {
@@ -62,10 +74,10 @@ export struct FolderSelectDialog {
   }
 
   changeDir(href: string) {
-    // let path = href.split('/');
-    // if (path[path.length - 1] === '') {
-    //   path.pop()
-    // }
+    if (this.basePath !== "" && this.basePath !== '/') {
+      href = href.replace(this.basePath, "")
+      console.log(`change dir, href replaced: ${href}`)
+    }
     this.path = href;
     if (!this.path.endsWith('/')) {
       this.path += '/'
@@ -77,11 +89,16 @@ export struct FolderSelectDialog {
   }
 
   onCancel() {
-    if (this.path.length <= 1) {
+    this.path = strip(this.path, '/')
+    if (this.path === "/" || this.path === "") {
       Dialog.closeDialog();
       return true;
     } else {
-      this.path = this.rootPath
+      // this.path = this.rootPath
+      let dl = this.path.split('/')
+      dl.pop()
+      this.path = dl.join('/')
+      console.log(`onCancel: ${this.path}`)
       this.changeDir(this.path)
       return false;
     }
@@ -182,7 +199,7 @@ export struct FolderSelectDialog {
           Text(`已选路径：/${this.deviceName}`)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
         } else {
-          Text(`已选路径：${this.path}/${this.deviceName}`)
+          Text(`已选路径：${this.path}${this.deviceName}`)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
         }
       }

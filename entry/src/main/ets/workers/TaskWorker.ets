@@ -1,4 +1,4 @@
-import { ErrorEvent, MessageEvents, ThreadWorkerGlobalScope, url, worker } from '@kit.ArkTS';
+import { ErrorEvent, MessageEvents, ThreadWorkerGlobalScope, url, util, worker } from '@kit.ArkTS';
 import { common, sendableContextManager } from '@kit.AbilityKit';
 import { BusinessError, emitter, request } from '@kit.BasicServicesKit';
 import { base64Encode, deleteFile, fileSize, getMimeTypeFromExtension, strip } from '../utils/tools';
@@ -62,10 +62,11 @@ workerPort.onerror = (event: ErrorEvent) => {
 let session: rcp.Session;
 
 async function updateSerConfig(server: string, username: string, password: string) {
+  console.log(`username=${username}, password=${password}`)
   session?.close()
   session = rcp.createSession({
-    baseAddress: server,
-    headers: { "Accept": "text/plain,application/xml" },
+    // baseAddress: server,
+    headers: { "Accept": "text/plain,text/html,application/xml" },
     requestConfiguration: {
       transfer: {
         timeout: { connectMs: 3000 }
@@ -107,13 +108,17 @@ async function mkRemotePath(remoteUri: string, server: string, backupRootPath: s
   for (let dir of dirList) {
     // 创建目录
     currentPath += `/${dir}`;
-    // console.log(`创建远程目录: ${currentPath}`);
+    console.log(`创建远程目录: ${currentPath}`);
+    let rs = await colExists(currentPath)
+    if (rs) {
+      continue
+    }
     const rr = await mkDir(currentPath);
     if ((rr.statusCode >= 200 && rr.statusCode < 300) || rr.statusCode == 405) {
       continue
     } else {
       // 创建目录失败
-      console.error(`创建目录 ${currentPath} 失败：${rr.message}`);
+      console.error(`创建目录 ${currentPath} 失败：${rr.message}, code: ${rr.statusCode}}`);
       return false;
     }
   }
@@ -131,7 +136,13 @@ async function rcpRequest(req: rcp.Request) {
       requestReturn.message = "请求失败"
       return requestReturn;
     }
-    // console.log(JSON.stringify(resp.headers));
+    console.log(`${req.method} ${req.url} | ${resp.statusCode}`)
+    console.log(`headers: ${JSON.stringify(resp.headers)}`);
+    // 输出响应的body内容，resp.body为ArrayBuffer类型
+    const decoder = new util.TextDecoder();
+    let body: string = decoder.decodeToString(new Uint8Array(resp.body));
+    console.log(body)
+
     requestReturn.statusCode = resp.statusCode;
     requestReturn.headers = resp.headers;
     if (resp.statusCode === 401) {
@@ -176,7 +187,7 @@ async function rcpRequest(req: rcp.Request) {
 // 是否存在
 async function fileExists(path: string, size: number) {
   // console.log(`查询${path}是否存在`)
-  const req = new rcp.Request(path, "HEAD");
+  const req = new rcp.Request(path, "PROPFIND", { "Depth": "0" });
   const rr = await rcpRequest(req);
   // 不存在
   if (!rr.success) {
@@ -205,8 +216,8 @@ async function colExists(path: string) {
   if (!path.endsWith('/')) {
     path = path + '/';
   }
-  // console.log(`查询${path}是否存在`)
-  const req = new rcp.Request(path, "HEAD");
+  console.log(`查询${path}是否存在`)
+  const req = new rcp.Request(path, "PROPFIND", { "Depth": "0" });
   const rr = await rcpRequest(req);
   return rr.success;
 }
@@ -214,7 +225,7 @@ async function colExists(path: string) {
 // 创建目录
 async function mkDir(path: string) {
   if (!path.endsWith('/')) {
-    path = path + '/';
+    path += '/'
   }
   const req = new rcp.Request(path, "MKCOL");
   return await rcpRequest(req);
@@ -363,7 +374,7 @@ function getFullRemoteUri(remoteUri: string, hasBaseUri: boolean, server: string
   console.log(remoteUri, server, backupRootPath)
   let url: string = "";
   if (hasBaseUri) {
-    url = strip(server, '/')
+    url = server
   }
   const rootPath = strip(backupRootPath, '/');
   url += `${rootPath}/${remoteUri}`;

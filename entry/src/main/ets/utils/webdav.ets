@@ -1,10 +1,11 @@
 import { rcp } from "@kit.RemoteCommunicationKit";
 import { ServerConfig } from "../models/Server";
-import { xml, util } from '@kit.ArkTS';
+import { util } from '@kit.ArkTS';
 import { DavResource, SERVER_AUTH_FAILED_EVENT } from "../typing";
 import { BusinessError, emitter, request } from "@kit.BasicServicesKit";
-import { base64Encode, deleteFile, getMimeTypeFromExtension } from "./tools";
+import { base64Encode, deleteFile, getMimeTypeFromExtension, strip } from "./tools";
 import { TaskItem } from "../models/TaskItem";
+import { WebDAVParser } from "./webdavParser";
 
 export class RequestReturn {
   success: boolean = true;
@@ -78,9 +79,15 @@ export class WebDav {
         requestReturn.message = "请求失败"
         return requestReturn;
       }
-      // console.log(JSON.stringify(resp.headers));
+      console.log(resp.statusCode + "")
+      console.log(JSON.stringify(resp.headers));
+      // 输出响应的body内容，resp.body为ArrayBuffer类型
+      const decoder = new util.TextDecoder();
+      let body: string = decoder.decodeToString(new Uint8Array(resp.body));
+      console.log(body)
       requestReturn.statusCode = resp.statusCode;
       requestReturn.headers = resp.headers;
+      requestReturn.body = body
       if (resp.statusCode === 401) {
         requestReturn.message = "用户名密码不正确"
         requestReturn.success = false;
@@ -111,7 +118,7 @@ export class WebDav {
       if (requestReturn.statusCode >= 200 && requestReturn.statusCode < 300) {
         // 正常
         requestReturn.statusCode = 200
-        requestReturn.body = resp.toString() ?? "";
+        // requestReturn.body = resp.toString() ?? "";
         requestReturn.success = true;
       } else {
         requestReturn.success = false;
@@ -138,7 +145,6 @@ export class WebDav {
 
   // 读取目录下的所有文件夹
   async getDirs(path: string = '/') {
-    console.log('get dirs')
     const body = "<?xml version=\"1.0\"?>\n" +
       "<d:propfind xmlns:d=\"DAV:\">\n" +
       "  <d:prop>\n" +
@@ -146,16 +152,24 @@ export class WebDav {
       "    <d:displayname/>\n" +
       "  </d:prop>\n" +
       "</d:propfind>"
-    console.log('get dirs: make real url')
     let url = this.server ? this.server.getRealUrl(path) : path
-    console.log("get dir url: " + url)
+    console.log("get dir url: " + url + `, path: ${path}`)
     const req = new rcp.Request(url, "PROPFIND", { "Depth": "1" }, body);
     const rr = await this.request(req);
+
     if (rr.statusCode === 200) {
       const items = this.parseXml(rr.body ? rr.body : "");
       const dirs: WebDavResource[] = [];
+      let basePath: string | undefined = ""
+      url = strip(url, '/')
+      let dl = url.split('/')
+      basePath = dl.pop()
+      console.log('get dir basePath: ' + basePath)
       items.forEach((item: WebDavResource) => {
-        if (item.type === 'collection') {
+        if (item.displayName == basePath || item.displayName == "" || item.href == "/") {
+          return
+        }
+        if (item.type === 'directory') {
           dirs.push(item)
         }
       })
@@ -329,61 +343,77 @@ export class WebDav {
 
   // 解析dav xml
   parseXml(xmlStr: string | null): WebDavResource[] {
-    let textEncoder: util.TextEncoder = new util.TextEncoder();
-    let arrBuffer: Uint8Array = textEncoder.encodeInto(xmlStr); // 对数据编码，防止包含中文字符乱码
-    let that: xml.XmlPullParser = new xml.XmlPullParser(arrBuffer.buffer as object as ArrayBuffer, 'UTF-8');
+    // let textEncoder: util.TextEncoder = new util.TextEncoder();
+    // let arrBuffer: Uint8Array = textEncoder.encodeInto(xmlStr); // 对数据编码，防止包含中文字符乱码
+    // let that: xml.XmlPullParser = new xml.XmlPullParser(arrBuffer.buffer as object as ArrayBuffer, 'UTF-8');
+    // let items: WebDavResource[] = []
+    // let curItem: WebDavResource = new WebDavResource()
+    // let rtqz: boolean = false;
+    // let dpqz: boolean = false;
+    // let hrefqz: boolean = false;
+    //
+    // let options: xml.ParseOptions = {
+    //   supportDoctype: true,
+    //   ignoreNameSpace: true,
+    //   tokenValueCallbackFunction: (name: xml.EventType, value: xml.ParseInfo) => {
+    //     if (value.getName() === "D:href" && name === 2) {
+    //       hrefqz = true;
+    //       return true;
+    //     }
+    //     if (hrefqz && value.getName() === "" && name === 4) {
+    //       curItem.href = value.getText()
+    //       hrefqz = false;
+    //       return true;
+    //     }
+    //     if (value.getName() === "D:resourcetype" && name === 2) {
+    //       rtqz = true;
+    //       return true;
+    //     }
+    //     if (rtqz === true && name === 2 && value.getText() === "") {
+    //       curItem.type = value.getName().replace('D:', '')
+    //       rtqz = false;
+    //       return true;
+    //     }
+    //     if (value.getName() === "D:displayname" && name === 2) {
+    //       dpqz = true
+    //       return true;
+    //     }
+    //     if (dpqz === true) {
+    //       if (value.getName() === 'D:displayname') {
+    //         curItem.displayName = "";
+    //       } else {
+    //         curItem.displayName = value.getText();
+    //       }
+    //       dpqz = false
+    //
+    //       return true;
+    //     }
+    //     if (value.getName() == "D:status" && value.getDepth() === 4 && name === 2) {
+    //       // 结束
+    //       items.push(curItem)
+    //       curItem = new WebDavResource()
+    //     }
+    //     return true; //true:继续解析 false:停止解析
+    //   },
+    // };
+    // that.parseXml(options);
+    // items.splice(0, 1)
+    // return items;
+    if (!xmlStr) {
+      return []
+    }
     let items: WebDavResource[] = []
-    let curItem: WebDavResource = new WebDavResource()
-    let rtqz: boolean = false;
-    let dpqz: boolean = false;
-    let hrefqz: boolean = false;
-
-    let options: xml.ParseOptions = {
-      supportDoctype: true,
-      ignoreNameSpace: true,
-      tokenValueCallbackFunction: (name: xml.EventType, value: xml.ParseInfo) => {
-        if (value.getName() === "D:href" && name === 2) {
-          hrefqz = true;
-          return true;
-        }
-        if (hrefqz && value.getName() === "" && name === 4) {
-          curItem.href = value.getText()
-          hrefqz = false;
-          return true;
-        }
-        if (value.getName() === "D:resourcetype" && name === 2) {
-          rtqz = true;
-          return true;
-        }
-        if (rtqz === true && name === 2 && value.getText() === "") {
-          curItem.type = value.getName().replace('D:', '')
-          rtqz = false;
-          return true;
-        }
-        if (value.getName() === "D:displayname" && name === 2) {
-          dpqz = true
-          return true;
-        }
-        if (dpqz === true) {
-          if (value.getName() === 'D:displayname') {
-            curItem.displayName = "";
-          } else {
-            curItem.displayName = value.getText();
-          }
-          dpqz = false
-
-          return true;
-        }
-        if (value.getName() == "D:status" && value.getDepth() === 4 && name === 2) {
-          // 结束
-          items.push(curItem)
-          curItem = new WebDavResource()
-        }
-        return true; //true:继续解析 false:停止解析
-      },
-    };
-    that.parseXml(options);
-    items.splice(0, 1)
-    return items;
+    const result = WebDAVParser.parse(xmlStr);
+    console.log('xml parse: ' + JSON.stringify(result))
+    result.directories.forEach((dir, index) => {
+      let item: WebDavResource = {
+        displayName: dir.displayName,
+        type: dir.resourceType,
+        href: dir.href
+      }
+      // console.log(`${index + 1}. ${dir.displayName} (${dir.href})`);
+      items.push(item)
+    });
+    return items
   }
 }
