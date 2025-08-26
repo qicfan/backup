@@ -54,13 +54,13 @@ export class UploadWorkerItem {
 
 // worker池
 export class WorkerPool {
-  max: number = 10; // 最大进程数
+  max: number = 3; // 最大进程数
   min: number = 0; // 最小进程数
   current: number = 0; // 当前进程数
   workerFileUri: string = ""; // worker路径
   workerItems: Array<UploadWorkerItem> = [];
 
-  constructor(workerFileUri: string, max: number = 10, min: number = 0) {
+  constructor(workerFileUri: string, max: number = 3, min: number = 0) {
     this.workerFileUri = workerFileUri;
     this.max = max;
     this.min = min;

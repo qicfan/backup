@@ -1,7 +1,7 @@
 import { ErrorEvent, MessageEvents, ThreadWorkerGlobalScope, url, util, worker } from '@kit.ArkTS';
 import { common, sendableContextManager } from '@kit.AbilityKit';
 import { BusinessError, emitter, request } from '@kit.BasicServicesKit';
-import { base64Encode, deleteFile, fileSize, getMimeTypeFromExtension, strip } from '../utils/tools';
+import { base64Encode, deleteFile, fileSize, getMimeTypeFromExtension, ltrip, strip } from '../utils/tools';
 import { RequestReturn } from '../utils/webdav';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { SERVER_AUTH_FAILED_EVENT, TaskItemStatus } from '../typing';
@@ -85,9 +85,9 @@ async function updateSerConfig(server: string, username: string, password: strin
 }
 
 function getRealUrl(server: string, backupRootPath: string, path: string) {
-  let base = server + backupRootPath
+  let base = strip(server, '/') + '/' +  ltrip(backupRootPath, '/')
   base = strip(base, '/')
-  path = strip(path, '/')
+  path = ltrip(strip(path, '/'), '/')
   if (path == '/' || path == '') {
     return base
   }
@@ -108,7 +108,7 @@ async function mkRemotePath(remoteUri: string, server: string, backupRootPath: s
   for (let dir of dirList) {
     // 创建目录
     currentPath += `/${dir}`;
-    console.log(`创建远程目录: ${currentPath}`);
+    // console.log(`创建远程目录: ${currentPath}`);
     let rs = await colExists(currentPath)
     if (rs) {
       continue
@@ -136,12 +136,12 @@ async function rcpRequest(req: rcp.Request) {
       requestReturn.message = "请求失败"
       return requestReturn;
     }
-    console.log(`${req.method} ${req.url} | ${resp.statusCode}`)
-    console.log(`headers: ${JSON.stringify(resp.headers)}`);
+    // console.log(`${req.method} ${req.url} | ${resp.statusCode}`)
+    // console.log(`headers: ${JSON.stringify(resp.headers)}`);
     // 输出响应的body内容，resp.body为ArrayBuffer类型
-    const decoder = new util.TextDecoder();
-    let body: string = decoder.decodeToString(new Uint8Array(resp.body));
-    console.log(body)
+    // const decoder = new util.TextDecoder();
+    // let body: string = decoder.decodeToString(new Uint8Array(resp.body));
+    // console.log(body)
 
     requestReturn.statusCode = resp.statusCode;
     requestReturn.headers = resp.headers;
@@ -216,7 +216,7 @@ async function colExists(path: string) {
   if (!path.endsWith('/')) {
     path = path + '/';
   }
-  console.log(`查询${path}是否存在`)
+  // console.log(`查询${path}是否存在`)
   const req = new rcp.Request(path, "PROPFIND", { "Depth": "0" });
   const rr = await rcpRequest(req);
   return rr.success;
@@ -331,13 +331,13 @@ async function copyFile(context: common.Context, taskItemId: number, photoType: 
   } else {
     // 普通图片和视频
     if (photoType === photoAccessHelper.PhotoType.IMAGE) {
-        const rs = await Photos.saveImage(context, uri, imageUri);
+        const rs = await Photos.saveImage(context, uri, imageUri, size);
         if (rs !== "success") {
           throw new Error(rs);
         }
     }
     if (photoType === photoAccessHelper.PhotoType.VIDEO) {
-        const rs = await Photos.saveVideo(context, uri, imageUri);
+        const rs = await Photos.saveVideo(context, uri, imageUri, size);
         if (rs !== "success") {
           throw new Error(rs);
         }
@@ -371,14 +371,12 @@ function getWaitList(offset: number = 1, limit: number = 100): relationalStore.R
 }
 
 function getFullRemoteUri(remoteUri: string, hasBaseUri: boolean, server: string, backupRootPath: string) {
-  console.log(remoteUri, server, backupRootPath)
   let url: string = "";
   if (hasBaseUri) {
-    url = server
+    url = strip(server, '/')
   }
-  const rootPath = strip(backupRootPath, '/');
-  url += `${rootPath}/${remoteUri}`;
-  console.log(url)
+  const rootPath = ltrip(strip(backupRootPath, '/'), '/');
+  url += `/${rootPath}/${remoteUri}`;
   return url;
 }
 
@@ -551,7 +549,7 @@ async function doTask(uploadItem: TaskItemSendable): Promise<boolean> {
       await upload(context, taskItemId, uploadItem.serverBaseUrl, uploadItem.backupRootPath, imageUri, filesDir,
         remoteUri, size, name, auth);
       if (subType === photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
-        // 上传视频
+        // 上传动态照片的视频
         await upload(context, taskItemId, uploadItem.serverBaseUrl, uploadItem.backupRootPath, videoUri, filesDir,
           videoRemoteUri, videoSize, name, auth);
       }

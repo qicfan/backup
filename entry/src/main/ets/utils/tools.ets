@@ -24,44 +24,61 @@ export function copyImg2Sandbox(src: string, path: string, size: number): boolea
     return false;
   }
   try {
-    destImage = fileIo.openSync(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
+    destImage = fileIo.openSync(path, fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.CREATE);
   } catch (e) {
     console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`);
     return false;
   }
   let exists: boolean = false;
   try {
-    const stat = fileIo.statSync(destImage.fd);
-    if(stat.size === size) {
-      exists = true;
-    } else {
-      fileIo.unlinkSync(path);
-    }
+    fileIo.statSync(destImage.fd);
+    exists = true;
   } catch (e) {
     console.log(`获取目标文件${path}的状态出错：code:${e.code}, msg:${e.message}}`)
     exists = false;
   }
-  if (!exists) {
-    try {
-      fileIo.copyFileSync(srcImage.fd, destImage.fd);
-      console.log(`复制文件: ${path} 成功`);
-    } catch (e) {
-      console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`)
-    }
-  } else {
-    console.log(`复制文件: ${path}已存在`)
+  if (exists) {
+    return true
   }
-  fileIo.closeSync(srcImage);
-  fileIo.closeSync(destImage);
+  try {
+    // const chunkSize = 1024; // 1KB
+    // let buffer = new ArrayBuffer(chunkSize);
+    // let readResult: number;
+    // do {
+    //   readResult = fileIo.readSync(srcImage.fd, buffer);
+    //   if (readResult > 0) {
+    //     // 创建适当大小的缓冲区
+    //     const writeBuffer = readResult < chunkSize ? buffer.slice(0, readResult) : buffer;
+    //     fileIo.writeSync(destImage.fd, writeBuffer);
+    //   }
+    // } while (readResult > 0);
+    fileIo.copyFileSync(srcImage.fd, destImage.fd)
+    console.info(`复制文件: ${src}=>${path}成功`);
+  } catch (e) {
+    console.error(`复制文件: ${src}=>${path}失败，code: ${e.code}, msg: ${e.message}`);
+    return false
+  } finally {
+    fileIo.closeSync(srcImage);
+    fileIo.closeSync(destImage);
+  }
+  let d: fileIo.File
+  try {
+    d = fileIo.openSync(path, fileIo.OpenMode.READ_ONLY);
+    let destStat = fileIo.statSync(d.fd)
+    console.log(`复制完成的文件${path}，文件大小：${destStat.size}`)
+  } catch (e) {
+    console.error(`检查复制完成的文件大小: ${path}, message=${e.message}, code=${e.code}`)
+    return false
+  } finally {
+    fileIo.closeSync(d!);
+  }
   return true;
 }
 
 export function deleteFile(filePath: string) {
-  if (!filePath) {
-    return;
-  }
   try {
     fileIo.unlinkSync(filePath)
+    console.info(`删除文件成功：${filePath}`)
   } catch (e) {
     console.error(`删除文件错误，code:${e.code}, 错误信息：${e.message}`)
   }
@@ -206,6 +223,9 @@ export async function calculateFileHash(fileStream: fileIo.Stream, size: number)
 
 export function strip(str: string, trip: string) {
   return str.endsWith(trip) ? str.slice(0, -1) : str;
+}
+export function ltrip(str: string, trip: string) {
+  return str.startsWith(trip) ? str.substring(1) : str
 }
 
 export function checkBattery(config: Config) {

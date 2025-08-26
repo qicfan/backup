@@ -4,7 +4,7 @@ import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { TaskItem } from "../models/TaskItem";
 import { image } from "@kit.ImageKit";
-import { fileSize } from "./tools";
+import { copyImg2Sandbox, fileSize } from "./tools";
 import { fileIo } from "@kit.CoreFileKit";
 
 export class Photos {
@@ -140,7 +140,7 @@ export class Photos {
     });
   }
 
-  static async saveVideo(ctx: Context, uri: string, videoUri: string): Promise<string> {
+  static async saveVideo(ctx: Context, uri: string, videoUri: string, size: number): Promise<string> {
     return new Promise(async (resolve, reject) => {
       let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
       predicates.equalTo(photoAccessHelper.PhotoKeys.PHOTO_TYPE, photoAccessHelper.PhotoType.VIDEO).and().equalTo('uri', uri);
@@ -151,13 +151,28 @@ export class Photos {
       let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx);
       let assetResult: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> = await phAccessHelper.getAssets(fetchOptions);
       if (!assetResult || assetResult.getCount() <= 0) {
-        resolve("无法查询到图片数据")
+        resolve("无法查询到视频数据")
         return;
       }
       let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
       let requestOptions: photoAccessHelper.RequestOptions = {
         deliveryMode: photoAccessHelper.DeliveryMode.HIGH_QUALITY_MODE,
+        compatibleMode: photoAccessHelper.CompatibleMode.ORIGINAL_FORMAT_MODE
       }
+      // 直接复制文件
+      // try {
+      //   if (copyImg2Sandbox(asset.uri, videoUri, size)) {
+      //     console.log(`导出视频成功：${asset.uri} => ${videoUri}`)
+      //     resolve('success')
+      //   } else {
+      //     reject('failed')
+      //   }
+      // } catch (e) {
+      //   console.error('Failed to copy image or video to sandbox. And the error is: ' + e);
+      //   reject(e)
+      // } finally {
+      //
+      // }
 
       try {
         await photoAccessHelper.MediaAssetManager.requestVideoFile(ctx, asset, requestOptions, videoUri, {
@@ -166,6 +181,7 @@ export class Photos {
               resolve("读取视频数据出错，请检查该视频是否存在或重试");
               return ;
             }
+            console.log(`导出视频成功：${asset.uri} => ${videoUri}`)
             resolve('success');
           }
         });
@@ -176,77 +192,88 @@ export class Photos {
     });
   }
 
-  static async saveImage(ctx: Context, uri: string, imageUri: string): Promise<string> {
+  static async saveImage(ctx: Context, uri: string, imageUri: string, size: number): Promise<string> {
     return new Promise(async (resolve, reject) => {
+      // try {
+      //   if (copyImg2Sandbox(uri, imageUri, size)) {
+      //     resolve('success')
+      //   } else {
+      //     reject('failed')
+      //   }
+      // } catch (e) {
+      //   console.error('Failed to copy image or video to sandbox. And the error is: ' + e);
+      //   reject(e)
+      // }
       let file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
-      console.info('file fd: ' + file.fd);
+      // console.info('file fd: ' + file.fd);
       //根据文件fd创建imagSource
       const imageSource: image.ImageSource = image.createImageSource(file.fd);
-      const keys = [
-      // 基础信息
-        image.PropertyKey.IMAGE_DESCRIPTION,
-        image.PropertyKey.MAKE,
-        image.PropertyKey.MODEL,
-        image.PropertyKey.ORIENTATION,
-        image.PropertyKey.X_RESOLUTION,
-        image.PropertyKey.Y_RESOLUTION,
-        image.PropertyKey.RESOLUTION_UNIT,
-        image.PropertyKey.SOFTWARE,
-        image.PropertyKey.DATE_TIME,
-        image.PropertyKey.OFFSET_TIME,
-
-        // GPS
-        image.PropertyKey.GPS_VERSION_ID,
-        image.PropertyKey.GPS_LATITUDE_REF,
-        image.PropertyKey.GPS_LATITUDE,
-        image.PropertyKey.GPS_LONGITUDE_REF,
-        image.PropertyKey.GPS_LONGITUDE,
-        image.PropertyKey.GPS_ALTITUDE_REF,
-        image.PropertyKey.GPS_ALTITUDE,
-        image.PropertyKey.GPS_STATUS,
-        image.PropertyKey.GPS_MAP_DATUM,
-
-        // 拍摄参数
-        image.PropertyKey.EXPOSURE_TIME,
-        image.PropertyKey.F_NUMBER,
-        image.PropertyKey.EXPOSURE_PROGRAM,
-        image.PropertyKey.ISO_SPEED_RATINGS,
-        image.PropertyKey.SENSITIVITY_TYPE,
-        image.PropertyKey.EXIF_VERSION,
-        image.PropertyKey.DATE_TIME_ORIGINAL,
-        image.PropertyKey.DATE_TIME_DIGITIZED,
-        image.PropertyKey.SHUTTER_SPEED,
-        image.PropertyKey.APERTURE_VALUE,
-        image.PropertyKey.EXPOSURE_BIAS_VALUE,
-        image.PropertyKey.MAX_APERTURE_VALUE,
-        image.PropertyKey.METERING_MODE,
-        image.PropertyKey.LIGHT_SOURCE,
-        image.PropertyKey.FLASH,
-        image.PropertyKey.FOCAL_LENGTH,
-        image.PropertyKey.COLOR_SPACE,
-        image.PropertyKey.PIXEL_X_DIMENSION,
-        image.PropertyKey.PIXEL_Y_DIMENSION,
-        image.PropertyKey.WHITE_BALANCE,
-        image.PropertyKey.DIGITAL_ZOOM_RATIO,
-        image.PropertyKey.SCENE_CAPTURE_TYPE,
-        image.PropertyKey.GAIN_CONTROL,
-        image.PropertyKey.CONTRAST,
-        image.PropertyKey.SATURATION,
-        image.PropertyKey.SHARPNESS,
-        image.PropertyKey.BODY_SERIAL_NUMBER,
-        image.PropertyKey.LENS_SPECIFICATION
-      ]
-      imageSource.getImageProperties(keys).then((data) => {
-        console.info(JSON.stringify(data));
-      }).catch((err: BusinessError) => {
-        console.error(JSON.stringify(err));
-      });
+      // const keys = [
+      // // 基础信息
+      //   image.PropertyKey.IMAGE_DESCRIPTION,
+      //   image.PropertyKey.MAKE,
+      //   image.PropertyKey.MODEL,
+      //   image.PropertyKey.ORIENTATION,
+      //   image.PropertyKey.X_RESOLUTION,
+      //   image.PropertyKey.Y_RESOLUTION,
+      //   image.PropertyKey.RESOLUTION_UNIT,
+      //   image.PropertyKey.SOFTWARE,
+      //   image.PropertyKey.DATE_TIME,
+      //   image.PropertyKey.OFFSET_TIME,
+      //
+      //   // GPS
+      //   image.PropertyKey.GPS_VERSION_ID,
+      //   image.PropertyKey.GPS_LATITUDE_REF,
+      //   image.PropertyKey.GPS_LATITUDE,
+      //   image.PropertyKey.GPS_LONGITUDE_REF,
+      //   image.PropertyKey.GPS_LONGITUDE,
+      //   image.PropertyKey.GPS_ALTITUDE_REF,
+      //   image.PropertyKey.GPS_ALTITUDE,
+      //   image.PropertyKey.GPS_STATUS,
+      //   image.PropertyKey.GPS_MAP_DATUM,
+      //
+      //   // 拍摄参数
+      //   image.PropertyKey.EXPOSURE_TIME,
+      //   image.PropertyKey.F_NUMBER,
+      //   image.PropertyKey.EXPOSURE_PROGRAM,
+      //   image.PropertyKey.ISO_SPEED_RATINGS,
+      //   image.PropertyKey.SENSITIVITY_TYPE,
+      //   image.PropertyKey.EXIF_VERSION,
+      //   image.PropertyKey.DATE_TIME_ORIGINAL,
+      //   image.PropertyKey.DATE_TIME_DIGITIZED,
+      //   image.PropertyKey.SHUTTER_SPEED,
+      //   image.PropertyKey.APERTURE_VALUE,
+      //   image.PropertyKey.EXPOSURE_BIAS_VALUE,
+      //   image.PropertyKey.MAX_APERTURE_VALUE,
+      //   image.PropertyKey.METERING_MODE,
+      //   image.PropertyKey.LIGHT_SOURCE,
+      //   image.PropertyKey.FLASH,
+      //   image.PropertyKey.FOCAL_LENGTH,
+      //   image.PropertyKey.COLOR_SPACE,
+      //   image.PropertyKey.PIXEL_X_DIMENSION,
+      //   image.PropertyKey.PIXEL_Y_DIMENSION,
+      //   image.PropertyKey.WHITE_BALANCE,
+      //   image.PropertyKey.DIGITAL_ZOOM_RATIO,
+      //   image.PropertyKey.SCENE_CAPTURE_TYPE,
+      //   image.PropertyKey.GAIN_CONTROL,
+      //   image.PropertyKey.CONTRAST,
+      //   image.PropertyKey.SATURATION,
+      //   image.PropertyKey.SHARPNESS,
+      //   image.PropertyKey.BODY_SERIAL_NUMBER,
+      //   image.PropertyKey.LENS_SPECIFICATION
+      // ]
+      // imageSource.getImageProperties(keys).then((data) => {
+      //   console.info(JSON.stringify(data));
+      // }).catch((err: BusinessError) => {
+      //   console.error(JSON.stringify(err));
+      // });
       let info = imageSource.getImageInfoSync(0)
       // 写入文件
       let newFile = fileIo.openSync(imageUri, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
       const imagePackerApi = image.createImagePacker();
       let packOpts : image.PackingOption = { format:info.mimeType, quality: 100, needsPackProperties: true, desiredDynamicRange: image.PackingDynamicRange.AUTO };
       imagePackerApi.packToFile(imageSource, newFile.fd, packOpts).then(() => {
+        console.info(`导出普通照片成功：${uri} => ${imageUri}`)
         resolve('success')
       }).catch((error : BusinessError) => {
         console.error('Failed to pack the image. And the error is: ' + error);
@@ -254,8 +281,10 @@ export class Photos {
       }).finally(()=>{
         fileIo.closeSync(file.fd);
         fileIo.closeSync(newFile.fd)
+        imageSource.release()
+        imagePackerApi.release()
       })
-      // 关闭文件
+      // // 关闭文件
       // let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
       // predicates.equalTo(photoAccessHelper.PhotoKeys.PHOTO_TYPE, photoAccessHelper.PhotoType.IMAGE).and().equalTo('uri', uri);
       // let fetchOptions: photoAccessHelper.FetchOptions = {
@@ -327,6 +356,7 @@ export class Photos {
 
       let requestOptions: photoAccessHelper.RequestOptions = {
         deliveryMode: photoAccessHelper.DeliveryMode.HIGH_QUALITY_MODE,
+        compatibleMode: photoAccessHelper.CompatibleMode.ORIGINAL_FORMAT_MODE
       }
 
       try {
@@ -337,6 +367,7 @@ export class Photos {
             }
             // console.info(`读取动态图片${uri}，图片：${movingPhoto.getUri()}=>${imageUri}, 视频:${videoUri}`)
             movingPhoto.requestContent(imageUri, videoUri).then(() => {
+              console.info(`导出动态照片成功：${uri} => ${imageUri}， ${videoUri}}`)
               resolve("success")
             }).catch((err: BusinessError) => {
               console.error(`动态图片保存失败, error code is ${err.code}, message is ${err.message}`);
