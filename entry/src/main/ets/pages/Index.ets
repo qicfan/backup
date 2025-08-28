@@ -1,7 +1,6 @@
 import { IBestNotify } from "@ibestservices/ibest-ui-v2";
 import { ServerConfig } from "../models/Server";
 import { AppStorageV2, ComponentContent, LevelMode, promptAction } from "@kit.ArkUI";
-import { common, WantAgent, wantAgent } from "@kit.AbilityKit";
 import { Global } from "../models/Global";
 import {
   ConfigGlobalStatus,
@@ -12,7 +11,6 @@ import { Login } from "../components/Login";
 import { WebDav } from "../utils/webdav";
 import { Privacy } from "../components/Privacy";
 import { TipDialog } from "../dialogs/TipDialog";
-import { Dialog } from "../utils/dialog";
 import { Agreement } from "../components/Agreement";
 import { Home } from "../components/Home";
 import { TaskUpload } from "../utils/taskUpload";
@@ -29,7 +27,7 @@ class TipDialogParams {
   pageInfos: NavPathStack = new NavPathStack();
 
   constructor(event: (init: boolean) => void, pageInfos: NavPathStack) {
-    this.event = event;;
+    this.event = event;
     this.pageInfos = pageInfos;
   }
 }

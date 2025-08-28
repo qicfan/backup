@@ -14,18 +14,18 @@ export struct Login {
   @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local addBtnLoading: boolean = false;
-  @Local serverPath: string = "/"
+  // @Local serverPath: string = "/"
   @Local serverHost: string = "192.168.1.1"
-  @Local serverPort: string = "5005"
-  @Local username: string = ""
-  @Local password: string = ""
+  @Local serverPort: string = "12334"
+  @Local username: string = "admin"
+  @Local password: string = "admin"
 
   pop: boolean = false;
 
   async addServer() {
     this.pop = this.pageInfos.getParamByIndex(1) as boolean;
     // 判断数据是否为空
-    if (this.serverHost === '' || this.serverPort === '' || this.serverPath === '' || this.username === '' || this.password === '') {
+    if (this.serverHost === '' || this.serverPort === '' || this.username === '' || this.password === '') {
       IBestNotify.show({
         message: '请输入服务器、用户名、密码。',
         duration: 3000,
@@ -33,20 +33,9 @@ export struct Login {
       })
       return
     }
-    // 路径必须以/结尾
-    if (this.serverPath !== '/' && !this.serverPath.endsWith('/')) {
-      this.serverPath += '/'
-    }
-    // 路径必须以/开头
-    if (this.serverPath !== '/' && !this.serverPath.startsWith('/')) {
-      this.serverPath = '/' + this.serverPath
-    }
     this.addBtnLoading = true
-    console.log(`${this.serverHost}, ${this.serverPort}, ${this.serverPath}`)
-    this.server.server = `http://${this.serverHost}:${this.serverPort}${this.serverPath}`;
-    // this.server.path = this.serverPath
-    // this.server.host = this.serverHost
-    // this.server.port = this.serverPort
+    console.log(`${this.serverHost}, ${this.serverPort}`)
+    this.server.server = `http://${this.serverHost}:${this.serverPort}}`;
     this.server.username = this.username;
     this.server.password = this.password;
     this.webdav.updateSerConfig(this.server);
@@ -87,7 +76,6 @@ export struct Login {
     let urlObj = url.URL.parseURL(this.server.server)
     this.serverHost = urlObj.hostname
     this.serverPort = urlObj.port
-    this.serverPath = urlObj.pathname
     this.username = this.server.username
     this.password = this.server.password
   }
@@ -100,6 +88,9 @@ export struct Login {
     NavDestination() {
       Scroll() {
         Column() {
+          Text("请先安装服务端(同样是开源项目)再进行登录和备份，服务端地址：https://github.com/qicfan/backup-server")
+            .width('100%')
+            .padding($r('app.float.normal_padding'))
           IBestField({
             value: this.serverHost!!,
             label: "IP或域名",
@@ -111,12 +102,6 @@ export struct Login {
             label: "端口",
             required: true,
             placeholder: "5005",
-          })
-          IBestField({
-            value: this.serverPath!!,
-            label: "默认路径",
-            required: true,
-            placeholder: "/",
           })
           IBestField({
             value: this.username!!,
