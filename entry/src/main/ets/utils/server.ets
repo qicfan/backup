@@ -24,8 +24,8 @@ export interface Token {
 
 export interface DirItem {
   name: string
-  rel_path: string
-  is_dir: boolean
+  relPath: string
+  isDir: boolean
 }
 
 export interface PathExists {
@@ -101,10 +101,12 @@ export class BackupServer {
   async dirList(path: string): Promise<DirItem[]>{
     let data: Record<string, string> = {"path": path}
     let resp: HttpResp<DirItem[]> = await this.post<DirItem[]>("/api/listdir", null, data)
+    console.log(JSON.stringify(resp))
     if (!resp || !resp.success || !resp.result) {
       console.warn(`查询目录或文件 ${path} 的子目录列表时失败：${resp.message}`)
       return []
     }
+
     return resp.result.data
   }
 
@@ -168,10 +170,13 @@ export class BackupServer {
           return lastResp;
         }
         if (lastResp?.resp?.responseCode == http.ResponseCode.UNAUTHORIZED) {
+          console.error(`${method} ${urlPath} 失败: token已过期，重新登录后重试`)
           // token过期
           this.login() // 获取token,然后重试
         }
-        if (lastResp.resp?.responseCode == http.ResponseCode.INTERNAL_ERROR) {}
+        if (lastResp.resp?.responseCode == http.ResponseCode.INTERNAL_ERROR) {
+          console.error(`${method} ${urlPath} 失败: ${lastResp.message}`)
+        }
       } catch (e) {
         console.error(`${method} ${urlPath} 失败: ${e.message}`)
         lastResp.message = e.message
@@ -185,13 +190,11 @@ export class BackupServer {
     return new Promise((resolve, reject) => {
       let httpRequest = http.createHttp();
       try {
-        let urlObj = new url.URL()
-        urlObj.host = this.server ? this.server.server : ""
-        urlObj.pathname = urlPath
+        let urlBase = `${this.server.server}${urlPath}`
+        let urlObj = url.URL.parseURL(urlBase)
         if (method == http.RequestMethod.GET && data) {
-          Object.keys(data).forEach((k: string) => {
-            urlObj.params.set(k, data[k])
-          })
+          let queryParams = new url.URLParams(data)
+          urlBase += '?' + queryParams.toString()
         }
         if (headers == null) {
           headers = {}
@@ -211,7 +214,7 @@ export class BackupServer {
           options.extraData = JSON.stringify(data)
         }
         options.header = headers
-        httpRequest.request(urlObj.toString(), options).then((resp: http.HttpResponse) => {
+        httpRequest.request(urlBase, options).then((resp: http.HttpResponse) => {
           // 解析结果
           let result = JSON.parse(resp.result as string) as ApiResponse<T>
           let httpResp: HttpResp<T> = {

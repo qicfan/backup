@@ -16,6 +16,7 @@ import { Home } from "../components/Home";
 import { TaskUpload } from "../utils/taskUpload";
 import { BackGroundUtil } from "../utils/BackgroundUtil";
 import { TaskItemDetail } from "../components/TaskItemDetail";
+import { BackupServer } from "../utils/server";
 
 @Builder
 function buildTip(params: TipDialogParams) {
@@ -37,7 +38,7 @@ class TipDialogParams {
 struct Index {
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
-  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
+  @Local backupServer: BackupServer = AppStorageV2.connect(BackupServer, "BackupServer", () => BackupServer.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack();
   @Local creatingTask: boolean = false;
@@ -128,8 +129,8 @@ struct Index {
     }
     this.global.loginStatus = LoginStatus.NO_LOGIN;
     // 检查服务器是否可用
-    this.webdav.updateSerConfig(this.server);
-    const rs = await this.webdav.valid();
+    this.backupServer.updateConfig(this.server, this.config);
+    const rs = await this.backupServer.valid();
     if (!rs) {
       this.init = 1;
       // 登录失败，重新登录

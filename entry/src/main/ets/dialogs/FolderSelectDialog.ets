@@ -25,7 +25,7 @@ export struct FolderSelectDialog {
   @Local formInputError: boolean = false
   @Local newDirDialog: boolean = false;
 
-  private deviceName = encodeURIComponent(deviceInfo.marketName);
+  private deviceName = deviceInfo.marketName;
 
   menu: EditableTitleBarMenuItem = {
     value: $r('sys.media.ohos_ic_public_add'), isEnabled: true, action: () => {this.newDirDialog = true;}
@@ -50,6 +50,11 @@ export struct FolderSelectDialog {
 
   aboutToAppear() {
     let path = this.rootPath;
+    if (!path) {
+      path = ""
+    } else {
+      path = path.replace('/' + this.deviceName, '')
+    }
     this.path = path
     console.log(`已选路径：${this.path}`)
     this.backupServer.dirList(this.path).then((rr) => {
@@ -66,6 +71,7 @@ export struct FolderSelectDialog {
     } else {
       this.path += '/' + name;
     }
+    console.log(`切换到路径：${this.path}`)
     this.backupServer.dirList(this.path).then((rr) => {
       this.dirList = rr
     }).catch(() => {
@@ -169,9 +175,9 @@ export struct FolderSelectDialog {
                 .width('100%')
               }
               .onClick(() => {
-                this.changeDir(item.rel_path)
+                this.changeDir(item.name)
               })
-            }, (item: DirItem) => item.rel_path)
+            }, (item: DirItem) => item.relPath)
           }
           .listDirection(Axis.Vertical) // 排列方向
           .scrollBar(BarState.Off)
@@ -196,10 +202,10 @@ export struct FolderSelectDialog {
 
       Column() {
         if (this.path == "/" || this.path == "") {
-          Text(`已选路径：/${this.deviceName}`)
+          Text(`已选路径：${this.deviceName}`)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
         } else {
-          Text(`已选路径：${this.path}${this.deviceName}`)
+          Text(`已选路径：${this.path}/${this.deviceName}`)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
         }
       }

@@ -36,7 +36,7 @@ export class DB {
           const CREATE_CONFIG_TABLE = "CREATE TABLE config (\n" +
             "    backup_type      INTEGER    DEFAULT (1),\n" +
             "    backup_root_path TEXT (256),\n" +
-            "    access_token     TEXT (256) \n" +
+            "    access_token     TEXT (256), \n" +
             "    dir_rule         TEXT,\n" +
             "    low_battery_stop INTEGER    DEFAULT (1),\n" +
             "    only_wifi_backup INTEGER    DEFAULT (1),\n" +
@@ -67,7 +67,7 @@ export class DB {
             "    uploaded_at INTEGER\n" +
             ");";
           const dateNow = Math.floor(Date.now() / 1000);
-          const configIniSql = `INSERT INTO config VALUES (1, '', 'yyyy/mm/dd', 1, 1, 2, 0, ${dateNow}, 0)`;
+          const configIniSql = `INSERT INTO config VALUES (2, '', '', 'yyyy/mm/dd', 1, 1, 2, 0, ${dateNow}, 0)`;
           try {
             store.executeSql(CREATE_CONFIG_TABLE);
             console.log("config table created.")

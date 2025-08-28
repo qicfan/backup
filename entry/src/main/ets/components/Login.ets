@@ -34,14 +34,13 @@ export struct Login {
       return
     }
     this.addBtnLoading = true
-    console.log(`${this.serverHost}, ${this.serverPort}`)
     let protocol = 'http'
     if (this.isHttps) {
       protocol = 'https'
     }
     let host = this.serverHost.replace(/^\//, '');
     let port = this.serverPort.replace(/^\//, '');
-    this.server.server = `${protocol}://${host}:${port}}`;
+    this.server.server = `${protocol}://${host}:${port}`;
     this.server.username = this.username;
     this.server.password = this.password;
     this.backupServer.updateConfig(this.server)
@@ -94,6 +93,12 @@ export struct Login {
     // console.log("登录页面销毁")
   }
 
+  @Builder httpsSwitch() {
+    IBestSwitch({
+      value: this.isHttps!!
+    })
+  }
+
   build() {
     NavDestination() {
       Scroll() {
@@ -115,12 +120,10 @@ export struct Login {
           })
           IBestCell({
             title: '是否启用HTTPS',
-            center: false,
+            center: true,
             required: true,
-            hasBorder: false,
-            valueBuilder: () => IBestSwitch({
-              value: this.isHttps!!
-            })
+            hasBorder: true,
+            valueBuilder: () => this.httpsSwitch()
           })
           IBestField({
             value: this.username!!,
