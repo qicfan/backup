@@ -1,20 +1,20 @@
 import { ServerConfig } from "../models/Server";
 import { AppStorageV2 } from "@kit.ArkUI";
-import { IBestButton, IBestField, IBestNotify } from "@ibestservices/ibest-ui-v2";
-import { WebDav } from "../utils/webdav";
+import { IBestButton, IBestCell, IBestField, IBestNotify, IBestSwitch } from "@ibestservices/ibest-ui-v2";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 import { LoginStatus } from "../typing";
 import { url } from "@kit.ArkTS";
+import { BackupServer } from "../utils/server";
 
 @ComponentV2
 export struct Login {
   @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack()
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
-  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
+  @Local backupServer: BackupServer = AppStorageV2.connect(BackupServer, "BackupServer", () => BackupServer.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local addBtnLoading: boolean = false;
-  // @Local serverPath: string = "/"
+  @Local isHttps: boolean = false
   @Local serverHost: string = "192.168.1.1"
   @Local serverPort: string = "12334"
   @Local username: string = "admin"
@@ -35,13 +35,18 @@ export struct Login {
     }
     this.addBtnLoading = true
     console.log(`${this.serverHost}, ${this.serverPort}`)
-    this.server.server = `http://${this.serverHost}:${this.serverPort}}`;
+    let protocol = 'http'
+    if (this.isHttps) {
+      protocol = 'https'
+    }
+    let host = this.serverHost.replace(/^\//, '');
+    let port = this.serverPort.replace(/^\//, '');
+    this.server.server = `${protocol}://${host}:${port}}`;
     this.server.username = this.username;
     this.server.password = this.password;
-    this.webdav.updateSerConfig(this.server);
-    const rs = await this.webdav.valid();
-    console.log(JSON.stringify(rs));
-    if (rs.statusCode !== 200) {
+    this.backupServer.updateConfig(this.server)
+    const rs = await this.backupServer.login();
+    if (!rs.success) {
       IBestNotify.show({
         message: rs.message,
         duration: 3000
@@ -74,6 +79,11 @@ export struct Login {
       return
     }
     let urlObj = url.URL.parseURL(this.server.server)
+    let protocol = urlObj.protocol
+    this.isHttps = false
+    if (protocol == 'https') {
+      this.isHttps = true
+    }
     this.serverHost = urlObj.hostname
     this.serverPort = urlObj.port
     this.username = this.server.username
@@ -102,6 +112,15 @@ export struct Login {
             label: "端口",
             required: true,
             placeholder: "5005",
+          })
+          IBestCell({
+            title: '是否启用HTTPS',
+            center: false,
+            required: true,
+            hasBorder: false,
+            valueBuilder: () => IBestSwitch({
+              value: this.isHttps!!
+            })
           })
           IBestField({
             value: this.username!!,

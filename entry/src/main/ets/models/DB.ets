@@ -36,6 +36,7 @@ export class DB {
           const CREATE_CONFIG_TABLE = "CREATE TABLE config (\n" +
             "    backup_type      INTEGER    DEFAULT (1),\n" +
             "    backup_root_path TEXT (256),\n" +
+            "    access_token     TEXT (256) \n" +
             "    dir_rule         TEXT,\n" +
             "    low_battery_stop INTEGER    DEFAULT (1),\n" +
             "    only_wifi_backup INTEGER    DEFAULT (1),\n" +

@@ -137,6 +137,12 @@ export function base64Encode(str: string) {
   return base64.encodeToStringSync(encoder.encodeInto(str));
 }
 
+export function urlSafeBase64(path: string): string {
+  path = encodeURIComponent(path)
+  const base64 = base64Encode(path)
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 /**
  * 获取当前网络类型
  * @returns 返回网络类型字符串

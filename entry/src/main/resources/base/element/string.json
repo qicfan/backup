@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "使用webdav协议将相册被分到NAS"
+      "value": "将相册被分到NAS"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "使用webdav协议将相册被分到NAS"
+      "value": "将相册被分到NAS"
     },
     {
       "name": "EntryAbility_label",
-      "value": "webdav相册备份"
+      "value": "家庭云相册"
     },
     {
       "name": "internet_reason",
