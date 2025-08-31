@@ -8,15 +8,15 @@ import {
 } from "../typing";
 import { Config } from "../models/Config";
 import { Login } from "../components/Login";
-import { WebDav } from "../utils/webdav";
 import { Privacy } from "../components/Privacy";
 import { TipDialog } from "../dialogs/TipDialog";
 import { Agreement } from "../components/Agreement";
 import { Home } from "../components/Home";
-import { TaskUpload } from "../utils/taskUpload";
 import { BackGroundUtil } from "../utils/BackgroundUtil";
 import { TaskItemDetail } from "../components/TaskItemDetail";
 import { BackupServer } from "../utils/server";
+import { ServerPhotoItemDetail } from "../components/ServerPhotoItemDetail";
+import { TaskUpload } from "../utils/taskUpload";
 
 @Builder
 function buildTip(params: TipDialogParams) {
@@ -86,7 +86,7 @@ struct Index {
       console.log(`index 触发 后台任务`);
       (BackGroundUtil.getInstance()).startBackground();
     } else {
-      console.log(`index 触发 后台任务失败, ${this.global.processId}, ${canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")}`);
+      console.log(`index 未触发 后台任务, ${this.global.processId}, ${canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")}`);
     }
   }
 
@@ -123,6 +123,7 @@ struct Index {
     const serverExists = await this.server.queryAsset();
     if (!serverExists) {
       // 没有服务器配置
+      console.warn('找不到服务器设置，重新登录')
       this.init = 1;
       this.pageInfos.pushPath({ name: "login" })
       return false;
@@ -134,6 +135,7 @@ struct Index {
     if (!rs) {
       this.init = 1;
       // 登录失败，重新登录
+      console.warn('登录失败，重新登录')
       this.pageInfos.pushPath({ name: "login" });
       return false;
     }
@@ -175,6 +177,8 @@ struct Index {
       Agreement()
     } else if (name == "taskItemDetail") {
       TaskItemDetail()
+    } else if (name == "serverItemDetail") {
+      ServerPhotoItemDetail()
     }
   }
 

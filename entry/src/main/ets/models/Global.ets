@@ -23,11 +23,5 @@ export class Global {
   static STOP_BACKGROUND_EVENT = 'stop_background'; // 触发任务停止
   static STOP_TASK_EVENT = 'stop_task'; // 触发任务停止
   static UPDATE_TASK_ITEM_EVENT = 'update_task_item_event'; // 开始执行某个任务
-  static BACKUP_UPLOAD_WORKER_IDLE = 'BACKUP.UPLOAD.WORKER.IDLE'; // 有上传线程空闲
-  static BACKUP_COPY_WORKER_IDLE = 'BACKUP.COPY.WORKER.IDLE'; // 有上传线程空闲
-  static BACKUP_COPY_FINISH = 'BACKUP.COPY.FINISH'; // 文件复制完成事件
-  static BACKUP_TASK_FINISH = "BACKUP.TASK.FINISH"; // 备份任务已完成
-  static BACKUP_PAUSE = 'BACKUP.PAUSE'; // 暂停事件
   static EXIT_EVENT = "APP.EXIT";
-  static PAUSE = false; // 是否暂停任务
 }

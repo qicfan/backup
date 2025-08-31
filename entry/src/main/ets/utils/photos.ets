@@ -6,6 +6,10 @@ import { TaskItem } from "../models/TaskItem";
 import { image } from "@kit.ImageKit";
 import { copyImg2Sandbox, fileSize } from "./tools";
 import { fileIo } from "@kit.CoreFileKit";
+import { BackupServer } from "./server";
+import { ServerConfig } from "../models/Server";
+import { Config } from "../models/Config";
+import { common } from "@kit.AbilityKit";
 
 export class Photos {
   /**
@@ -14,6 +18,8 @@ export class Photos {
    */
   static async getPhotos(ctx: Context, lastTimestamp: number, page: number = 1,
     pageSize: number = 100): Promise<TaskItem[]> {
+    let backupServer = BackupServer.getInstance()
+    backupServer.updateConfig(ServerConfig.getInstance(), Config.getInstance())
     const items: TaskItem[] = []
     // 循环直到没有数据
     let predicates = new dataSharePredicates.DataSharePredicates();
@@ -51,6 +57,25 @@ export class Photos {
         item.size = ps.get('size') as number;
         item.status = TaskItemStatus.WAIT;
         item.makeUri(ctx);
+        let realPath = item.remoteUri
+        // 通过uri查询是否存在
+        let exists = await backupServer.exists(ps.uri, true, false)
+        if (exists) {
+          continue
+        }
+        // 查询服务器上是否存在该文件，先检查backupRootPath下是否有该文件
+        exists = await backupServer.exists(realPath, true)
+        if (exists) {
+          // console.info(`${item.uri} => ${realPath} 已存在服务端1，跳过`)
+          continue
+        }
+        // 再检查根目录下是否有该文件
+        exists = await backupServer.exists(realPath)
+        if (exists) {
+          // console.info(`${item.uri} => ${realPath} 已存在服务端2，跳过`)
+          continue
+        }
+
         const rs = await item.save();
         if (rs) {
           items.push(item);
@@ -83,6 +108,25 @@ export class Photos {
       let asset: photoAccessHelper.PhotoAsset = await assetResult.getFirstObject();
       resolve(asset);
     });
+  }
+
+  static async getMovingPhoto(context: Context, photoAsset: photoAccessHelper.PhotoAsset): Promise<photoAccessHelper.MovingPhoto> {
+    return new Promise((resolve, reject) => {
+      photoAccessHelper.MediaAssetManager.requestMovingPhoto(context, photoAsset, {
+        deliveryMode: photoAccessHelper.DeliveryMode.FAST_MODE
+      }, {
+        async onDataPrepared(movingPhoto: photoAccessHelper.MovingPhoto) {
+          if (movingPhoto !== undefined) {
+            // 应用可自定义对movingPhoto的处理逻辑。
+            console.info('request moving photo successfully, uri: ' + movingPhoto.getUri());
+            resolve(movingPhoto)
+          } else {
+            resolve(undefined)
+          }
+        }
+      })
+    })
+
   }
 
   // 通过uri获取PhotoAsset做进一步的展示
@@ -381,4 +425,6 @@ export class Photos {
       }
     });
   }
+
+
 }

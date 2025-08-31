@@ -86,7 +86,7 @@ export class ServerConfig {
     let attr: asset.AssetMap = new Map();
     attr.set(asset.Tag.SECRET, stringToArray(password));
     attr.set(asset.Tag.ALIAS, stringToArray(PASSWORD_ALIAS));
-    attr.set(asset.Tag.ACCESSIBILITY, asset.Accessibility.DEVICE_UNLOCKED); // 设备解锁状态可访问
+    attr.set(asset.Tag.ACCESSIBILITY, asset.Accessibility.DEVICE_FIRST_UNLOCKED); // 设备解锁状态可访问
     attr.set(asset.Tag.AUTH_TYPE, asset.AuthType.NONE) // 不需要认证即可访问数据
     attr.set(asset.Tag.IS_PERSISTENT, false) // 卸载应用时删除
     attr.set(asset.Tag.CONFLICT_RESOLUTION, asset.ConflictResolution.OVERWRITE) // 冲突时覆盖旧的
@@ -105,6 +105,7 @@ export class ServerConfig {
   async updateAsset(server: string, username: string, password: string) {
     let attr: asset.AssetMap = new Map();
     attr.set(asset.Tag.SECRET, stringToArray(password));
+    // attr.set(asset.Tag.ACCESSIBILITY, asset.Accessibility.DEVICE_FIRST_UNLOCKED); // 设备解锁状态可访问
     attr.set(asset.Tag.DATA_LABEL_NORMAL_1, stringToArray(username)); // 用户名
     attr.set(asset.Tag.DATA_LABEL_NORMAL_2, stringToArray(server)); // 服务器地址
     let query: asset.AssetMap = new Map();

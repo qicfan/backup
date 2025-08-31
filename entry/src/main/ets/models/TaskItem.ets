@@ -120,9 +120,9 @@ export class TaskItem {
    * @param pageSize
    * @returns
    */
-  static async getWaitList(page: number = 1, pageSize: number = 10): Promise<TaskItem[]> {
+  static async getWaitList(ctx: Context, page: number = 1, pageSize: number = 10): Promise<TaskItem[]> {
     const offset = (page - 1) * pageSize;
-    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status IN (?, ?, ?) ORDER BY id DESC LIMIT ? OFFSET ?`;
+    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status IN (?, ?, ?) ORDER BY id ASC LIMIT ? OFFSET ?`;
     try {
       const rs = await DB.getInstance().store?.querySql(SQL, [TaskItemStatus.WAIT, TaskItemStatus.UPLOADING, TaskItemStatus.FAIL, pageSize, offset]);
       if (rs === undefined || rs.rowCount <= 0) {
@@ -130,16 +130,81 @@ export class TaskItem {
       }
       console.log(`查询到的待备份总数:${rs.rowCount}`);
       const items: TaskItem[] = [];
+      const willDeleteIds: number[] = []
       while (rs.goToNextRow()) {
         const taskItem = TaskItem.getInstance(rs);
+        // 查询是否存在
+        const asset = await Photos.getPhotoAssetByUri(ctx, taskItem.uri);
+        if (asset === null || asset === undefined) {
+          console.warn("照片不存在: " + taskItem.uri);
+          willDeleteIds.push(taskItem.id)
+        }
         items.push(taskItem)
       }
       rs.close();
+      if (willDeleteIds.length > 0) {
+        // 删除这些条目
+        TaskItem.deleteByIds(willDeleteIds)
+      }
       return items
     } catch (error) {
       let err = error as BusinessError;
       console.log(`${err.code} => ${err.message}`)
       return [];
+    }
+  }
+
+  /**
+   * 查询待备份列表（要上传的数据）
+   * @param page
+   * @param pageSize
+   * @returns
+   */
+  static async getUploadList(ctx: Context, pageSize: number = 10): Promise<TaskItem[]> {
+    const SQL = `SELECT * FROM ${TaskItem.TABLE_NAME} WHERE status IN (?) ORDER BY id ASC LIMIT ?`;
+    try {
+      const rs = await DB.getInstance().store?.querySql(SQL, [TaskItemStatus.WAIT, pageSize]);
+      if (rs === undefined || rs.rowCount <= 0) {
+        return [];
+      }
+      console.log(`查询到的待上传总数:${rs.rowCount}`);
+      const items: TaskItem[] = [];
+      const willDeleteIds: number[] = []
+      while (rs.goToNextRow()) {
+        const taskItem = TaskItem.getInstance(rs);
+        // 查询是否存在
+        const asset = await Photos.getPhotoAssetByUri(ctx, taskItem.uri);
+        if (asset === null || asset === undefined) {
+          console.warn("照片不存在: " + taskItem.uri);
+          willDeleteIds.push(taskItem.id)
+        }
+        items.push(taskItem)
+      }
+      rs.close();
+      if (willDeleteIds.length > 0) {
+        // 删除这些条目
+        TaskItem.deleteByIds(willDeleteIds)
+      }
+      return items
+    } catch (error) {
+      let err = error as BusinessError;
+      console.log(`${err.code} => ${err.message}`)
+      return [];
+    }
+  }
+
+
+  // 根据ID批量删除item
+  static async deleteByIds(ids: number[]) {
+    let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
+    predicates.in("id", ids);
+    let store = DB.getInstance().store
+    if (store != null) {
+      store.delete(predicates).then((rows: number) => {
+        console.info(`Delete rows: ${rows}`);
+      }).catch((err: BusinessError) => {
+        console.error(`Delete failed, code is ${err.code},message is ${err.message}`);
+      });
     }
   }
 
@@ -463,17 +528,5 @@ export class TaskItem {
       console.error(`task items ${this.remoteUri} insert failed, code is ${err.code},message is ${err.message}`);
       return false;
     }
-  }
-
-  getFullRemoteUri(remoteUri: string, hasBaseUri: boolean = false) {
-    const server = ServerConfig.getInstance();
-    const config = Config.getInstance();
-    let url: string = "";
-    if (hasBaseUri) {
-      url = strip(server.server, '/')
-    }
-    const rootPath = strip(config.backupRootPath, '/');
-    url += `${rootPath}/${remoteUri}`;
-    return url;
   }
 }

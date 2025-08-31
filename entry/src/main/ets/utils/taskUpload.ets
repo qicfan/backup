@@ -2,10 +2,8 @@ import { TaskItem } from "../models/TaskItem";
 import {
   AUTOBackup,
   ConfigGlobalStatus, LoginStatus, TaskDoing } from "../typing";
-import { WorkerPool } from "./workerPool";
 import { BusinessError, emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
-import { WebDav } from "./webdav";
 import { IBestNotify, IBestToast } from "@ibestservices/ibest-ui-v2";
 import { checkBattery, checkWifi } from "./tools";
 import { Config } from "../models/Config";
@@ -13,10 +11,7 @@ import { checkPermissions } from "./permission";
 import { common, Context } from "@kit.AbilityKit";
 
 export class TaskUpload {
-  uploadWorkerPool: WorkerPool = new WorkerPool("entry/ets/workers/TaskWorker.ets")
-
   private static _instance: TaskUpload | null = null;
-  private _webdav: WebDav | null = null;
   private _config: Config | null = null;
   private _global: Global | null = null;
 
@@ -25,13 +20,6 @@ export class TaskUpload {
       TaskUpload._instance = new TaskUpload();
     }
     return TaskUpload._instance;
-  }
-
-  get webdav() {
-    if (this._webdav === null) {
-      this._webdav = WebDav.getInstance();
-    }
-    return this._webdav;
   }
 
   get config() {
@@ -76,34 +64,22 @@ export class TaskUpload {
       })
       return false;
     }
-    const rr = await this.webdav.valid();
-    if (!rr.success) {
-      IBestToast.show({
-        message: "服务器不可用，请检查当前设备的网络环境或者连接状态",
-        type: "warning",
-        duration: 3000
-      })
-      return false;
-    }
     return true;
   }
 
-  async start(ctx: Context, preTotal: number) {
+  async start(preTotal: number) {
     if (this.global.processId > 0) return false;
     if (!(await this.canStart())) return false;
     console.log(`taskUpload 任务开始执行...`)
     this.global.processId = 1;
     this.global.preTotal = preTotal;
     emitter.once(Global.STOP_TASK_EVENT, () => this.stop());
-    this.uploadWorkerPool.execute(ctx, preTotal);
     return true;
   }
 
   async stop() {
     console.log(`主线程收到暂停消息`)
     this.global.processId = 0;
-    // 终止所有上传线程
-    this.uploadWorkerPool.stop();
     emitter.emit(Global.STOP_BACKGROUND_EVENT);
   }
 
@@ -168,7 +144,7 @@ export class TaskUpload {
     } finally {
       if (this.config.auto === AUTOBackup.YES) {
         // 触发任务执行
-        this.start(ctx, TaskItem.getWaitCount());
+        this.start(TaskItem.getWaitCount());
       }
     }
     return exists;

@@ -74,7 +74,16 @@ export function copyImg2Sandbox(src: string, path: string, size: number): boolea
   }
   return true;
 }
-
+export function filePathDir(filePath: string) {
+  let dl = filePath.split('/')
+  dl.pop()
+  return dl.join('/')
+}
+export function filePathBase(filePath: string) {
+  let dl = filePath.split('/')
+  let name = dl.pop()
+  return name
+}
 export function deleteFile(filePath: string) {
   try {
     fileIo.unlinkSync(filePath)
@@ -83,6 +92,15 @@ export function deleteFile(filePath: string) {
     console.error(`删除文件错误，code:${e.code}, 错误信息：${e.message}`)
   }
   return;
+}
+
+export async function fileExists(pathOrFile: string): Promise<boolean> {
+  try {
+    await fileIo.stat(pathOrFile)
+    return true
+  } catch (e) {
+    return false
+  }
 }
 
 export function splitFileExt(filePath: string): string[] {
@@ -138,9 +156,10 @@ export function base64Encode(str: string) {
 }
 
 export function urlSafeBase64(path: string): string {
-  path = encodeURIComponent(path)
+  // path = encodeURIComponent(path)
   const base64 = base64Encode(path)
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return encodeURIComponent(base64)
+  // return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**
@@ -198,6 +217,20 @@ export function fileSize(filePath: string): number {
     return -1;
   }
 
+}
+
+export async function sha256(buffer: ArrayBuffer) {
+  let mdAlgName = 'SHA256'; // 摘要算法名。
+  let md = cryptoFramework.createMd(mdAlgName);
+  // 数据量较少时，可以只做一次update，将数据全部传入，接口未对入参长度做限制。
+  await md.update({ data: new Uint8Array(buffer) });
+  let mdResult = await md.digest();
+  // console.info('Md result:' + mdResult.data);
+  let mdLen = md.getMdLength();
+  // console.info("md len: " + mdLen);
+  return Array.from(mdResult.data)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 // 计算文件hash

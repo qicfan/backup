@@ -9,14 +9,9 @@ import { BusinessError, emitter } from '@kit.BasicServicesKit';
 import { BreakpointConstants } from '../common/BreakpointConstants';
 import { WinBreakpoint } from '../common/WinBreakpoint';
 import { WindowUtil } from '../utils/windowUtil';
-import { ConfigGlobalStatus, FormStatus, LoginStatus } from '../typing';
+import { FormStatus } from '../typing';
 import { formBindingData, formProvider } from '@kit.FormKit';
-import { TaskUpload } from '../utils/taskUpload';
-import { TaskItem } from '../models/TaskItem';
 import { Global } from '../models/Global';
-import { BackGroundUtil } from '../utils/BackgroundUtil';
-import { ServerConfig } from '../models/Server';
-import { Config } from '../models/Config';
 
 const DOMAIN = 0x0000;
 const TAG: string = 'WidgetEventCallEntryAbility';

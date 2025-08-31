@@ -6,6 +6,7 @@ import { Global } from "../models/Global";
 import { LoginStatus } from "../typing";
 import { url } from "@kit.ArkTS";
 import { BackupServer } from "../utils/server";
+import { Config } from "../models/Config";
 
 @ComponentV2
 export struct Login {
@@ -13,6 +14,7 @@ export struct Login {
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
   @Local backupServer: BackupServer = AppStorageV2.connect(BackupServer, "BackupServer", () => BackupServer.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
+  @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
   @Local addBtnLoading: boolean = false;
   @Local isHttps: boolean = false
   @Local serverHost: string = "192.168.1.1"
@@ -40,7 +42,13 @@ export struct Login {
     }
     let host = this.serverHost.replace(/^\//, '');
     let port = this.serverPort.replace(/^\//, '');
-    this.server.server = `${protocol}://${host}:${port}`;
+    let server = `${protocol}://${host}:${port}`;
+    let isRestBackupRootPath = false
+    if (this.server.server !== server) {
+      // 如果更改了服务器地址，责清空bakcupRootPath
+      isRestBackupRootPath = true
+    }
+    this.server.server = server
     this.server.username = this.username;
     this.server.password = this.password;
     this.backupServer.updateConfig(this.server)
@@ -58,6 +66,10 @@ export struct Login {
       await this.server.addOrUpdateAsset(this.server.server, this.username, this.password);
       this.addBtnLoading = false
       this.global.loginStatus = LoginStatus.LOGIN;
+      if (isRestBackupRootPath) {
+        this.config.backupRootPath = ""
+        await this.config.update()
+      }
       this.pageInfos.pop();
     } catch (error) {
       let err = error as BusinessError;

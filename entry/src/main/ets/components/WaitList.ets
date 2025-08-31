@@ -11,6 +11,7 @@ import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 import { TaskDoing } from "../typing";
 import { BreakpointConstants } from "../common/BreakpointConstants";
+import { Upload } from "./Upload";
 
 @ComponentV2
 export struct WaitList {
@@ -27,16 +28,6 @@ export struct WaitList {
   @Local pageSize: number = 100;
   aboutToAppear(): void {
     this.getList(1).then(() => {})
-    emitter.on(Global.COLLECT_PHOTO_FINISH_EVENT, (data) => {
-      if (data.data?.exists === true) {
-        // 如果有新项目则刷新页面
-        this.getList(1).then(() => {})
-      }
-    })
-    emitter.on(Global.BACKUP_TASK_FINISH, () => {
-      // 备份完成后刷新页面
-      this.getList(1).then(() => {})
-    })
   }
 
   async getList(page: number = 1) {
@@ -46,7 +37,8 @@ export struct WaitList {
     }
     this.page = page;
     // 查询未备份照片列表
-    const items = await TaskItem.getWaitList(page, this.pageSize)
+    let ctx = getContext(this)
+    const items = await TaskItem.getWaitList(ctx, page, this.pageSize)
     if (this.page === 1) {
       this.data.clearData();
     }
@@ -68,16 +60,16 @@ export struct WaitList {
     }
     if (direction === 'pull') {
       this.getList(1).then(() => {
-        console.log(`hasMore: ${this.hasMore}`)
-        console.log('onRefreshing pull');
+        // console.log(`hasMore: ${this.hasMore}`)
+        // console.log('onRefreshing pull');
         this.isRefreshing = false;
       })
     } else {
       // 上滑加载更多
       console.log(`加载更多,页数:${this.page + 1}, pageSize: ${this.winBP.imagePageSize}`)
       this.getList(this.page + 1).then(() => {
-        console.log(`hasMore: ${this.hasMore}`)
-        console.log('onRefreshing slide');
+        // console.log(`hasMore: ${this.hasMore}`)
+        // console.log('onRefreshing slide');
         this.isRefreshing = false;
       })
     }
@@ -85,8 +77,7 @@ export struct WaitList {
 
   build() {
     Column() {
-      if (this.winBP.currentWidthBreakpoint !== BreakpointConstants.BREAKPOINT_SM ||
-        this.winBP.currentHeightBreakpoint !== BreakpointConstants.BREAKPOINT_MD) {
+      if (this.global.processId === 0) {
         Refresh({ refreshing: $$this.isRefreshing, promptText: "下拉刷新待备份列表" }) {
           if (this.total > 0) {
             Grid(this.scroller) {
@@ -108,7 +99,7 @@ export struct WaitList {
             .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
             .scrollBar(BarState.Auto)
             .onScrollIndex((start: number, end: number) => {
-              console.log(`scroll index start=${start}, end=${end}`)
+              // console.log(`scroll index start=${start}, end=${end}`)
               if (!this.hasMore) return;
               if (end < this.data.totalCount() - 1) return;
               this.isLoading = true;
@@ -127,8 +118,10 @@ export struct WaitList {
         .onRefreshing(() => {
           this.onRefresh('pull')
         })
+      } else {
+        Upload().layoutWeight(1).width('100%')
       }
-      if (this.total > 0 && this.global.taskGlobalStatus === TaskDoing.NO) {
+      if (this.total > 0) {
         TaskBottom()
           .width('100%')
       } else {
