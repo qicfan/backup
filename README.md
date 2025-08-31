@@ -1,4 +1,5 @@
 ## 鸿蒙5.0 鸿蒙Next(HarmonyOS Next) 相册备份 使用webdav协议备份到NAS
+#### 交流Q群：1055648718
 
 #### 上架失败：应用商店觉得功能单一，用户体验不好。
 #### 测试版本链接：[https://appgallery.huawei.com/link/invite-test-wap?taskId=cd1d1a840df25d887bc6676cea7b8308](https://appgallery.huawei.com/link/invite-test-wap?taskId=6ba7bd8c12fe21f814cff6c8330f4010)
