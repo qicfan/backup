@@ -119,7 +119,12 @@ async function connectWs(uploadFile: UploadEvent): Promise<webSocket.WebSocket> 
       return
     }
     let wsTmp = webSocket.createWebSocket();
-    let server = uploadFile.server.replace('https', 'ws').replace('http', 'ws')
+    let server: string = ""
+    if (uploadFile.server.indexOf('http://') >= 0) {
+      server = uploadFile.server.replace('http://', 'ws://')
+    } else if (uploadFile.server.indexOf('https://') >= 0) {
+      server = uploadFile.server.replace('https', 'wss')
+    }
     wsTmp.connect(`${server}/upload`, { header: {"Sec-WebSocket-Protocol": uploadFile.token}}).then((connected: boolean) => {
       if (!connected) {
         let rs: ApiResponse<undefined> = {code: 1, message: "ws服务链接失败", data: undefined}
