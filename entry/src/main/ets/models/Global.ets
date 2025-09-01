@@ -23,5 +23,6 @@ export class Global {
   static STOP_BACKGROUND_EVENT = 'stop_background'; // 触发任务停止
   static STOP_TASK_EVENT = 'stop_task'; // 触发任务停止
   static UPDATE_TASK_ITEM_EVENT = 'update_task_item_event'; // 开始执行某个任务
+  static DownloadProgress_Event = 'download_progress_event'
   static EXIT_EVENT = "APP.EXIT";
 }

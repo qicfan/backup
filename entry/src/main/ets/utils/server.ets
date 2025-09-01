@@ -1,10 +1,11 @@
 import { ServerConfig } from "../models/Server";
 import { http } from "@kit.NetworkKit";
-import { url } from "@kit.ArkTS";
-import { BusinessError } from "@kit.BasicServicesKit";
+import { taskpool, url } from "@kit.ArkTS";
+import { BusinessError, emitter } from "@kit.BasicServicesKit";
 import { Config } from "../models/Config";
-import { fileExists, filePathDir, splitFileExt, urlSafeBase64 } from "./tools";
+import { Checksum, fileExists, filePathDir, preChecksum, splitFileExt, urlSafeBase64 } from "./tools";
 import { fileIo } from "@kit.CoreFileKit";
+import { Global } from "../models/Global";
 
 export interface HttpResp<T> {
   success: boolean
@@ -111,6 +112,7 @@ export class BackupServer {
   // pathOrFile在服务端是否存在
   async exists(pathOrFile: string, hasBackupRoot: boolean = false, isPath: boolean = true): Promise<boolean> {
     let data: Record<string, string> = {}
+    let header: Record<string, string> = {}
     let relPath: string = pathOrFile
     if (isPath) {
       data["pathType"] = "1"
@@ -118,13 +120,15 @@ export class BackupServer {
         relPath = this.getRelPath(pathOrFile)
       }
       data["path"] = relPath
+      header["X-Pre-Checksum"] = ""
     } else {
       data["pathType"] = "2"
       data["path"] = pathOrFile
+      // 计算文件的preChecksum
+      let prechecksum = await taskpool.execute(preChecksum, pathOrFile) as string
+      header["X-Pre-Checksum"] = prechecksum
     }
-
-
-    let resp: HttpResp<PathExists> = await this.post<PathExists>("/api/exists", null, data)
+    let resp: HttpResp<PathExists> = await this.post<PathExists>("/api/exists", header, data)
     // console.log(JSON.stringify(resp.result))
     if (!resp || !resp.success || !resp.result) {
       console.warn(`查询目录或文件 ${pathOrFile} 是否存在时失败：${resp.message}`)
@@ -133,6 +137,19 @@ export class BackupServer {
     return resp.result.data.exists
   }
 
+  // 检查uri对应的checksum是否存在
+  async checksumExists(uri: string) {
+    let checksum = await taskpool.execute(Checksum, uri) as string
+    let data: Record<string, string> = {}
+    let header: Record<string, string> = {"X-Checksum": checksum}
+    let resp: HttpResp<PathExists> = await this.post<PathExists>("/api/exists-checksum", header, data)
+    // console.log(JSON.stringify(resp.result))
+    if (!resp || !resp.success || !resp.result) {
+      console.warn(`查询目录或文件 ${uri} 是否存在时失败：${resp.message}`)
+      return false
+    }
+    return resp.result.data.exists
+  }
   // basePath下的子目录列表
   async dirList(path: string): Promise<DirItem[]>{
     let data: Record<string, string> = {"path": path}
@@ -330,13 +347,16 @@ export class BackupServer {
 
 // 下载文件到沙箱路径
 @Concurrent
-export async function download(path: string, destPathOrFile: string, isLive: boolean, token: string, baseUrl: string, backupRootPath: string): Promise<boolean> {
+export async function download(path: string, destPathOrFile: string, isLive: boolean, transcode: boolean,
+  transcodeImageExt: string, transcodeVideoExt: string,
+  token: string, baseUrl: string, backupRootPath: string): Promise<boolean> {
   return await new Promise<boolean>((resolve, reject) => {
     let relPath = `${path}`
     // 将文件下载到destPathOrFile
     try {
       let urlBase = `${baseUrl}/photo/download`
-      let queryParams = new url.URLParams({"path": relPath, "cos": "HMOS", "live": isLive ? "1" : "0"})
+      let queryParams = new url.URLParams({"path": relPath, "cos": "HMOS", "live": isLive ? "1" : "0",
+      "transcode": transcode ? "1" : "0", "trans_image_ext": transcodeImageExt, "trans_video_ext": transcodeVideoExt})
       urlBase += '?' + queryParams.toString()
       let headers: Record<string, string> = {}
       headers["Authorization"] = "Bearer " + token
@@ -357,6 +377,7 @@ export async function download(path: string, destPathOrFile: string, isLive: boo
       httpRequest.on("dataReceiveProgress", (info: http.DataReceiveProgressInfo) => {
         // 计算进度
         // return progress(info)
+        emitter.emit(Global.DownloadProgress_Event, {data: info})
       })
       httpRequest.on("dataEnd", () => {
         // 取消订阅事件

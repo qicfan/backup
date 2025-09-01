@@ -17,6 +17,8 @@ import { TaskItemDetail } from "../components/TaskItemDetail";
 import { BackupServer } from "../utils/server";
 import { ServerPhotoItemDetail } from "../components/ServerPhotoItemDetail";
 import { TaskUpload } from "../utils/taskUpload";
+import { checkTempUsed, cleanTemp } from "../utils/tools";
+import { taskpool } from "@kit.ArkTS";
 
 @Builder
 function buildTip(params: TipDialogParams) {
@@ -75,6 +77,14 @@ struct Index {
     console.log('进入首页')
     this.initApp().then((rs) => {
       if (!rs) return ;
+      let ctx = getContext(this)
+      const tempDir = ctx.tempDir
+      // checkTempUsed(tempDir).then((rs) => {
+      //   if (!rs) {
+      //     return
+      //   }
+      //   cleanTemp(tempDir).then(() => {})
+      // })
       console.log(`开始创建任务`);
       (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
     })

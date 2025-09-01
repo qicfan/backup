@@ -4,12 +4,11 @@ import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { TaskItem } from "../models/TaskItem";
 import { image } from "@kit.ImageKit";
-import { copyImg2Sandbox, fileSize } from "./tools";
+import { fileSize } from "./tools";
 import { fileIo } from "@kit.CoreFileKit";
 import { BackupServer } from "./server";
 import { ServerConfig } from "../models/Server";
 import { Config } from "../models/Config";
-import { common } from "@kit.AbilityKit";
 
 export class Photos {
   /**
@@ -63,19 +62,11 @@ export class Photos {
         if (exists) {
           continue
         }
-        // 查询服务器上是否存在该文件，先检查backupRootPath下是否有该文件
-        exists = await backupServer.exists(realPath, true)
+        // 使用checksum来判断是否存在
+        exists = await backupServer.checksumExists(ps.uri)
         if (exists) {
-          // console.info(`${item.uri} => ${realPath} 已存在服务端1，跳过`)
           continue
         }
-        // 再检查根目录下是否有该文件
-        exists = await backupServer.exists(realPath)
-        if (exists) {
-          // console.info(`${item.uri} => ${realPath} 已存在服务端2，跳过`)
-          continue
-        }
-
         const rs = await item.save();
         if (rs) {
           items.push(item);

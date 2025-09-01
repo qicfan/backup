@@ -32,7 +32,7 @@ export struct Upload {
     this.existsIds = []
     let total = Global.getInstance().preTotal
     if (total < this.maxThreadCount.length) {
-      this.maxThreadCount.splice(total - 1, this.maxThreadCount.length - total)
+      this.maxThreadCount = Array.from<number, number>({length: total}, (_, index) => index + 1)
     }
     this.initUpload()
     emitter.once(Global.STOP_TASK_EVENT, () => {

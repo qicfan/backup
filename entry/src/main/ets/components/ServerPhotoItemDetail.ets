@@ -10,6 +10,7 @@ import { MovingPhotoView, MovingPhotoViewController, photoAccessHelper } from "@
 import { taskpool } from "@kit.ArkTS";
 import { deleteFile, splitFileExt } from "../utils/tools";
 import { Photos } from "../utils/photos";
+import { fileIo } from "@kit.CoreFileKit";
 
 @ComponentV2
 export struct ServerPhotoItemDetail {
@@ -26,6 +27,7 @@ export struct ServerPhotoItemDetail {
   private controller: MovingPhotoViewController = new MovingPhotoViewController();
   @Local mp: photoAccessHelper.MovingPhoto | undefined = undefined
   @Local loading: boolean = false
+  @Local progress: number = 0
   aboutToAppear(): void {
   }
 
@@ -96,23 +98,37 @@ export struct ServerPhotoItemDetail {
           if (!this.init) {
             IBestSkeletonParagraph({ type: "image", rowWidth: '100%', rowHeight: '100%' })
           } else {
-            if (this.fileUri == "" || (this.fileUri !== "" && this.serverPhotoItem?.type == 1)) {
-              // 普通照片
-              Image(this.thumbnail)
-                .width('100%')
-                .objectFit(ImageFit.Contain)
-            }
-            if (this.fileUri !== "" && this.serverPhotoItem?.type == 2) {
-              // 视频
-              Video({
-                src: this.serverPhotoItem.fileUri,
-                previewUri: this.thumbnail,
-                controller: this.vcontroller
-              })
-            }
-            if (this.fileUri !== "" && this.serverPhotoItem?.type == 3 && this.mp !== undefined) {
-              // 动态照片
-              MovingPhotoView({ movingPhoto: this.mp, controller: this.controller }){}
+            if (this.loading) {
+              // 显示下载进度
+              Column() {
+                Progress({value: this.progress, total: 100, type: ProgressType.Ring})
+                  .color('rgba(0, 85, 255, 1)')
+                  .style({ strokeWidth: 4, shadow: true})
+                  .height(48)
+              }
+              .width('100%')
+              .height('100%')
+              .alignItems(HorizontalAlign.Center)
+              .justifyContent(FlexAlign.Center)
+            } else {
+              if (this.fileUri == "" || (this.fileUri !== "" && this.serverPhotoItem?.type == 1)) {
+                // 普通照片
+                Image(this.thumbnail)
+                  .width('100%')
+                  .objectFit(ImageFit.Contain)
+              }
+              if (this.fileUri !== "" && this.serverPhotoItem?.type == 2) {
+                // 视频
+                Video({
+                  src: this.serverPhotoItem.fileUri,
+                  previewUri: this.thumbnail,
+                  controller: this.vcontroller
+                })
+              }
+              if (this.fileUri !== "" && this.serverPhotoItem?.type == 3 && this.mp !== undefined) {
+                // 动态照片
+                MovingPhotoView({ movingPhoto: this.mp, controller: this.controller })
+              }
             }
           }
         }
@@ -123,18 +139,16 @@ export struct ServerPhotoItemDetail {
           if (this.fileUri == "") {
             SaveButton({
               icon: SaveIconStyle.FULL_FILLED,
-              // text: SaveDescription.SAVE_TO_GALLERY,
               buttonType: ButtonType.Circle
             })
+              .height(28)
+              .width(28)
               .onClick(async (event, result: SaveButtonOnClickResult) => {
                 if (result != SaveButtonOnClickResult.SUCCESS) {
                   console.error('SaveButtonOnClickResult create asset failed');
                   return false;
                 }
-                if (!this.serverPhotoItem) {
-                  return false;
-                }
-                if (this.loading) {
+                if (!this.serverPhotoItem || this.loading) {
                   return false;
                 }
                 this.loading = true
@@ -143,14 +157,17 @@ export struct ServerPhotoItemDetail {
                 let context: Context = this.getUIContext().getHostContext() as common.UIAbilityContext;
                 let imageOrVideoDestFile = context.tempDir + '/' + this.serverPhotoItem.path
                 let ext = splitFileExt(this.serverPhotoItem.name)[0]
+                let transcode = false
                 if (ext.toLowerCase() == 'heic') {
                   imageOrVideoDestFile += '.jpg'
+                  transcode = true
                 }
                 let videoDestFile: string = ""
                 let success = false
                 try {
                   // 下载资源到本地路径
-                  success = await taskpool.execute(download, this.serverPhotoItem.path, imageOrVideoDestFile, this.serverPhotoItem.type == 3,
+                  success = await taskpool.execute(download, this.serverPhotoItem.path, imageOrVideoDestFile,
+                    this.serverPhotoItem.type == 3, transcode, ".jpg", ".mp4",
                     this.backupServer.getToken(), this.server.server, this.config.backupRootPath
                   ) as boolean;
                 } catch (err) {
@@ -172,9 +189,11 @@ export struct ServerPhotoItemDetail {
                   videoDestFile = context.tempDir + '/' + this.serverPhotoItem.live_photo_video_path
                   let ext = splitFileExt(videoDestFile)[0]
                   if (ext.toLowerCase() == 'mov') {
+                    transcode = true
                     videoDestFile += '.mp4'
                   }
-                  const success1 = await taskpool.execute(download, this.serverPhotoItem.live_photo_video_path, videoDestFile, true,
+                  const success1 = await taskpool.execute(download, this.serverPhotoItem.live_photo_video_path,
+                    videoDestFile, true, transcode, ".jpg", ".mp4",
                     this.backupServer.getToken(), this.server.server, this.config.backupRootPath
                   );
                   if (!success1) {
@@ -221,9 +240,11 @@ export struct ServerPhotoItemDetail {
                     this.serverPhotoItem.fileUri = asset.uri
                     this.mp = await Photos.getMovingPhoto(context, asset)
                   }
+
                   // 保存fileUri到服务器
                   await this.backupServer.photoUpdate(this.serverPhotoItem.path, asset.uri)
                   this.fileUri = asset.uri
+                  this.loading = false
                   return true
 
                 } catch (err) {
@@ -235,7 +256,9 @@ export struct ServerPhotoItemDetail {
           }
         }
         .width('100%')
-        .height(60)
+        .height(40)
+        .alignItems(HorizontalAlign.Center)
+        .justifyContent(FlexAlign.Center)
       }
       .width('100%')
       .height('100%')

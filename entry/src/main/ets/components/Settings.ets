@@ -8,6 +8,7 @@ import { FolderSelectDialog } from "../dialogs/FolderSelectDialog";
 import { ServerConfig } from "../models/Server";
 import { Global } from "../models/Global";
 import { About } from "./About";
+import { TempClean } from "./TempClean";
 
 class Params {
   rootPath: string = ""
@@ -182,6 +183,8 @@ export struct Settings {
             .onClick(() => {
               this.pageInfos.pushPathByName("agreement", true);
             })
+
+          // TempClean()
 
           About()
 

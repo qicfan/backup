@@ -28,6 +28,9 @@ export struct WaitList {
   @Local pageSize: number = 100;
   aboutToAppear(): void {
     this.getList(1).then(() => {})
+    emitter.on(Global.STOP_TASK_EVENT, () => {
+      this.getList(1).then(() => {})
+    })
   }
 
   async getList(page: number = 1) {
@@ -60,16 +63,12 @@ export struct WaitList {
     }
     if (direction === 'pull') {
       this.getList(1).then(() => {
-        // console.log(`hasMore: ${this.hasMore}`)
-        // console.log('onRefreshing pull');
         this.isRefreshing = false;
       })
     } else {
       // 上滑加载更多
       console.log(`加载更多,页数:${this.page + 1}, pageSize: ${this.winBP.imagePageSize}`)
       this.getList(this.page + 1).then(() => {
-        // console.log(`hasMore: ${this.hasMore}`)
-        // console.log('onRefreshing slide');
         this.isRefreshing = false;
       })
     }
