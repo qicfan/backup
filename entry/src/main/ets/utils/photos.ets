@@ -39,12 +39,18 @@ export class Photos {
       console.log(`查询照片失败，code=${err.code}, msg=${err.message}`)
       return items;
     }
-    try {
       while (!fetchRs.isAfterLast()) {
         let ps: photoAccessHelper.PhotoAsset;
-        ps = await fetchRs.getNextObject()
+        try {
+          ps = await fetchRs.getNextObject()
+        } catch (e) {
+          let err = e as BusinessError;
+          console.log(`获取photo assets失败，code=${err.code}, msg=${err.message}`)
+          continue
+        }
         const item = new TaskItem()
         item.dateAdded = ps.get('date_added') as number;
+        // console.log(`是否跳过文件，文件添加时间戳：${item.dateAdded}, 最后一次备份时间：${lastTimestamp}`)
         if (item.dateAdded < lastTimestamp) {
           continue;
         }
@@ -56,28 +62,34 @@ export class Photos {
         item.size = ps.get('size') as number;
         item.status = TaskItemStatus.WAIT;
         item.makeUri(ctx);
-        let realPath = item.remoteUri
-        // 通过uri查询是否存在
-        let exists = await backupServer.exists(ps.uri, true, false)
+        // let realPath = item.remoteUri
+        //1. 先通过path判断是否存在
+        let exists = await backupServer.exists(item.remoteUri, false, true)
         if (exists) {
           continue
+        } else {
+          console.log(`通过path查询到文件没有备份：${item.remoteUri}`)
         }
-        // 使用checksum来判断是否存在
+        //2. 通过uri查询是否存在
+        exists = await backupServer.exists(ps.uri, true, false, item.size)
+        if (exists) {
+          continue
+        } else {
+          console.log(`通过fileUri查询到文件没有备份：${item.uri}`)
+        }
+        //3. 使用checksum来判断是否存在
         exists = await backupServer.checksumExists(ps.uri)
         if (exists) {
           continue
+        } else {
+          console.log(`通过checksum查询到文件没有备份: ${item.remoteUri}`)
         }
         const rs = await item.save();
         if (rs) {
           items.push(item);
         }
       }
-    } catch (e) {
-      let err = e as BusinessError;
-      console.log(`获取photo assets失败，code=${err.code}, msg=${err.message}`)
-    }
     fetchRs.close();
-
     return items;
   }
 

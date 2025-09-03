@@ -110,7 +110,7 @@ export class BackupServer {
   }
 
   // pathOrFile在服务端是否存在
-  async exists(pathOrFile: string, hasBackupRoot: boolean = false, isPath: boolean = true): Promise<boolean> {
+  async exists(pathOrFile: string, hasBackupRoot: boolean = false, isPath: boolean = true, size: number = 0): Promise<boolean> {
     let data: Record<string, string> = {}
     let header: Record<string, string> = {}
     let relPath: string = pathOrFile
@@ -124,9 +124,11 @@ export class BackupServer {
     } else {
       data["pathType"] = "2"
       data["path"] = pathOrFile
+      // console.log(`开始计算文件的sha1：${pathOrFile}`)
       // 计算文件的preChecksum
-      let prechecksum = await taskpool.execute(preChecksum, pathOrFile) as string
-      header["X-Pre-Checksum"] = prechecksum
+      // let prechecksum = await taskpool.execute(preChecksum, pathOrFile, size) as string
+      // console.log(`文件的sha1: ${prechecksum}`)
+      // header["X-Pre-Checksum"] = ""
     }
     let resp: HttpResp<PathExists> = await this.post<PathExists>("/api/exists", header, data)
     // console.log(JSON.stringify(resp.result))
@@ -140,6 +142,7 @@ export class BackupServer {
   // 检查uri对应的checksum是否存在
   async checksumExists(uri: string) {
     let checksum = await taskpool.execute(Checksum, uri) as string
+    console.log(`文件的checksum: ${checksum}`)
     let data: Record<string, string> = {}
     let header: Record<string, string> = {"X-Checksum": checksum}
     let resp: HttpResp<PathExists> = await this.post<PathExists>("/api/exists-checksum", header, data)
@@ -282,7 +285,8 @@ export class BackupServer {
         // 构造http请求
         let options: http.HttpRequestOptions = {
           method: method,
-          expectDataType: http.HttpDataType.STRING
+          expectDataType: http.HttpDataType.STRING,
+          connectTimeout: 5000,
         }
         if (method == http.RequestMethod.POST && data) {
           // 发送json格式的数据

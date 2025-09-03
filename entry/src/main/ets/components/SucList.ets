@@ -79,7 +79,7 @@ export struct SucList {
               GridItem() {
                 ServerPhotoItemComponent({ serverPhotoItem: item, index: index })
               }
-            }, (item: ServerPhotoItem) => item ? item.id + '' : "0")
+            }, (item: ServerPhotoItem) => item.path)
           }
           .margin($r('app.float.normal_padding'))
           .cachedCount(10)
@@ -93,7 +93,8 @@ export struct SucList {
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
           .scrollBar(BarState.Auto)
           .onScrollIndex((start: number, end: number) => {
-            if (!this.hasMore) return ;
+            if (!this.hasMore) return;
+            if (end < this.data.totalCount() - 1) return;
             this.isLoading = true;
             this.getList(this.page + 1).then(() => {
               this.isLoading = false;

@@ -42,6 +42,7 @@ export class DB {
             "    only_wifi_backup INTEGER    DEFAULT (1),\n" +
             "    auto INTEGER    DEFAULT (1),\n" +
             "    first INTEGER    DEFAULT (0),\n" +
+            "    last_backup_time       INTEGER,\n" +
             "    created_at       INTEGER,\n" +
             "    updated_at       INTEGER\n" +
             ");\n"
@@ -67,7 +68,7 @@ export class DB {
             "    uploaded_at INTEGER\n" +
             ");";
           const dateNow = Math.floor(Date.now() / 1000);
-          const configIniSql = `INSERT INTO config VALUES (2, '', '', 'yyyy/mm/dd', 1, 1, 2, 0, ${dateNow}, 0)`;
+          const configIniSql = `INSERT INTO config VALUES (2, '', '', 'yyyy/mm/dd', 1, 1, 2, 0, ${dateNow}, ${dateNow}, 0)`;
           try {
             store.executeSql(CREATE_CONFIG_TABLE);
             console.log("config table created.")

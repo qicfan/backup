@@ -309,22 +309,22 @@ export class TaskItem {
    *
    */
   static async createTask(ctx: Context, config: Config) {
-    let lastTimestamp: number = 0;
-    if (config.backupType === BackupType.NEW) {
-      // 只备份新数据，开始时间是APP第一次打开时间
-      lastTimestamp = config.createdAt;
-    }
-    let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
-    predicates.orderByDesc('id').limitAs(1)
-    const rs = await DB.getInstance().store?.query(predicates)
-    console.log(`查询最后一条文件记录，返回数: ${rs?.rowCount}`)
-    if (rs !== undefined && rs.rowCount > 0) {
-      rs.goToNextRow()
-      lastTimestamp = rs.getLong(rs.getColumnIndex('created_at'))
-      console.log(`查询到的最后一次的时间1：${lastTimestamp}`)
-    }
-    console.log(`查询到的最后一次的时间2：${lastTimestamp}`)
-    rs?.close();
+    let lastTimestamp: number = config.lastBackupTime;
+    // if (config.backupType === BackupType.NEW) {
+    //   // 只备份新数据，开始时间是APP第一次打开时间
+    //   lastTimestamp = config.createdAt;
+    // }
+    // let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
+    // predicates.orderByDesc('id').limitAs(1)
+    // const rs = await DB.getInstance().store?.query(predicates)
+    // console.log(`查询最后一条文件记录，返回数: ${rs?.rowCount}`)
+    // if (rs !== undefined && rs.rowCount > 0) {
+    //   rs.goToNextRow()
+    //   lastTimestamp = rs.getLong(rs.getColumnIndex('created_at'))
+    //   console.log(`查询到的最后一次的时间1：${lastTimestamp}`)
+    // }
+    // console.log(`查询到的最后一次的时间2：${lastTimestamp}`)
+    // rs?.close();
     let page = 1;
     const pageSize = 100;
     let total = 0;
@@ -342,6 +342,8 @@ export class TaskItem {
       }
       page++
     }
+    // 修改最后备份时间
+    await config.updateLastBackupTime(Math.floor(Date.now() / 1000))
     console.log(`生成的待备份总数：${total}`)
     return total > 0
   }

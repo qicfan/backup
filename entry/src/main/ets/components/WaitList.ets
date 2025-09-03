@@ -31,6 +31,9 @@ export struct WaitList {
     emitter.on(Global.STOP_TASK_EVENT, () => {
       this.getList(1).then(() => {})
     })
+    emitter.on(Global.COLLECT_PHOTO_FINISH_EVENT, () => {
+      this.getList(1).then(() => {})
+    })
   }
 
   async getList(page: number = 1) {

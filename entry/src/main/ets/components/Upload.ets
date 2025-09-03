@@ -8,6 +8,7 @@ import { UploadQueue } from "../utils/UploadQueue";
 import { UploadItem } from "./UploadItem";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
+import { checkBattery, checkWifi } from "../utils/tools";
 
 @ComponentV2
 export struct Upload {
@@ -66,6 +67,14 @@ export struct Upload {
         // console.log('正在将待备份列表添加到队列，跳过本次检查')
         return
       }
+      if (!checkBattery(this.config)) {
+        isStop = true
+      }
+      checkWifi(this.config).then((rs) => {
+        if (!rs) {
+          isStop = true
+        }
+      })
       // console.log(`上传队列长度： ${this.uploadQueue.length()}`)
       if (this.uploadQueue.length() <= 10) {
         this.page ++

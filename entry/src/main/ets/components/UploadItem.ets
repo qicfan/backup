@@ -7,7 +7,7 @@ import { Photos } from "../utils/photos";
 import { UploadEvent } from "../typing";
 import { Config } from "../models/Config";
 import { ServerConfig } from "../models/Server";
-import { formatFileSize, splitFileExt } from "../utils/tools";
+import { checkBattery, checkWifi, formatFileSize, splitFileExt } from "../utils/tools";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 import { TaskItem } from "../models/TaskItem";
@@ -48,6 +48,16 @@ export struct UploadItem {
       if (this.isStop) {
         clearInterval(this.SI)
       }
+      if (!checkBattery(this.config)) {
+        this.isStop = true
+        this.isFinish = true
+      }
+      checkWifi(this.config).then((rs) => {
+        if (!rs) {
+          this.isStop = true
+          this.isFinish = true
+        }
+      })
       if (this.idle) {
         console.log(`线程 ${this.index}： 空闲，开始从队列读取待备份内容并开始执行`)
         this.process().then((rs: number) => {
