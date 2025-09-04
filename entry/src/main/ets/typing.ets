@@ -1,5 +1,3 @@
-import { TaskItem } from "./models/TaskItem";
-import { UploadItemSendable } from "./models/UploadItemSendable";
 
 export enum FormStatus {DEFAULT=0, COLLECT=1, EXEC=2};
 export enum LoginStatus { INIT = "init", NO_SERVER = "no_server", NO_LOGIN = "no_login", LOGIN = "login" }
@@ -11,38 +9,17 @@ export enum DirRule {YMD = 'yyyy/mm/dd', YM = 'yyyy/mm', Y = 'yyyy'}
 export enum LowBatteryStop {YES = 1, NO = 2}
 export enum OnlyWIFIBackup {YES = 1, NO = 2}
 export enum AUTOBackup {YES = 1, NO = 2}
-export enum TaskType {AUTO = 1, Manual = 2}
-export enum TaskStatus {WAIT = 1, PROCESS = 2, FINISH = 3}
 export enum PhotoType {IMAGE = 1, VIDEO = 2}
 export enum PhotoSubType {DEFAULT = 0, MOVING_PHOTO = 3, BURST = 4}
 export enum TaskItemStatus {WAIT = 1, SUCCESS = 2, FAIL = 3, UPLOADING = 4}
-export const SERVER_AUTH_FAILED_EVENT = 'server_auth_failed'; // 服务器验证失败
-export interface DavResource {
-  href: string
-  displayName: string,
-  type: string
-}
-export interface PhotoItem {
-  uri: string
-  media_type: number
-  subtype: number
-  display_name: string
-  date_added: number
-  date_modify: number
-  size: number
-}
-export interface LocalUri {
-  uri: string
-  file_uri: string
-}
+
 export interface UploadEvent {
-  ACTION: "START" | "STOP" | "UPDATE" | "FINISH" // START, STOP
-  id: number // Task.id
-  baseUrl: string
-  username: string
-  password: string
-  backupRootPath: string
-  cacheFileDir: string
+  path: string // 待备份的沙箱路径，包含文件名和backupRootPath，如MobileBackup/Huawei Pura X/2025/8/29/1111.jpg
+  type: number // 待备份的资源类型：1-照片，2-视频，3-动态照片
+  fileUri: string // 资源的系统路径
+  token: string // 访问凭证
+  server: string // 服务器地址
+  live_photo_video_path: string // 动态照片的视频的路径
 }
 
 export interface WorkerMessage {
@@ -52,20 +29,6 @@ export interface WorkerMessage {
   taskItemId: number
   uploadedSize?: number
   type: number
-}
-
-export interface CopyWorkerMessage {
-  action: "START" | "FINISH" | "UPDATE_PROGRESS" | "ERROR" | "FILE_NOT_EXISTS" | "SERVER_NOT_CONNECT"
-  code: number
-  message: string
-  taskItemId: number
-  imageSize: number
-  videoSize: number
-}
-
-export interface UploadQueueItem {
-  uploadItem: UploadItemSendable,
-  taskItem: TaskItem
 }
 
 export interface WindowBreakpoint {

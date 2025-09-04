@@ -1,4 +1,4 @@
-import { fileIo } from '@kit.CoreFileKit';
+import { fileIo, statfs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { connection } from '@kit.NetworkKit';
 import { batteryInfo, BusinessError } from '@kit.BasicServicesKit';
@@ -74,7 +74,16 @@ export function copyImg2Sandbox(src: string, path: string, size: number): boolea
   }
   return true;
 }
-
+export function filePathDir(filePath: string) {
+  let dl = filePath.split('/')
+  dl.pop()
+  return dl.join('/')
+}
+export function filePathBase(filePath: string) {
+  let dl = filePath.split('/')
+  let name = dl.pop()
+  return name
+}
 export function deleteFile(filePath: string) {
   try {
     fileIo.unlinkSync(filePath)
@@ -85,6 +94,15 @@ export function deleteFile(filePath: string) {
   return;
 }
 
+export async function fileExists(pathOrFile: string): Promise<boolean> {
+  try {
+    await fileIo.stat(pathOrFile)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
 export function splitFileExt(filePath: string): string[] {
   const l: string[] = filePath.split('.');
   let ext: string | undefined = l.pop();
@@ -93,35 +111,6 @@ export function splitFileExt(filePath: string): string[] {
   }
   const name = l.join('.')
   return [ext, name]
-}
-
-export function getMimeTypeFromExtension(filePath: string): string {
-  const extension = filePath.split('.').pop()?.toLowerCase() ?? '';
-
-  const mimeMap: Record<string, string> = {
-    'txt': 'text/plain',
-    'pdf': 'application/pdf',
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'gif': 'image/gif',
-    'mp3': 'audio/mpeg',
-    'mp4': 'video/mp4',
-    'doc': 'application/msword',
-    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'xls': 'application/vnd.ms-excel',
-    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'ppt': 'application/vnd.ms-powerpoint',
-    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'zip': 'application/zip',
-    'rar': 'application/x-rar-compressed',
-    'json': 'application/json',
-    'html': 'text/html',
-    'css': 'text/css',
-    'js': 'text/javascript'
-  };
-
-  return mimeMap[extension] || 'application/octet-stream';
 }
 
 export function fileName(filePath: string): string {
@@ -135,6 +124,13 @@ export function base64Encode(str: string) {
   const base64 = new util.Base64Helper();
   const encoder = new util.TextEncoder()
   return base64.encodeToStringSync(encoder.encodeInto(str));
+}
+
+export function urlSafeBase64(path: string): string {
+  // path = encodeURIComponent(path)
+  const base64 = base64Encode(path)
+  return encodeURIComponent(base64)
+  // return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**
@@ -194,32 +190,135 @@ export function fileSize(filePath: string): number {
 
 }
 
-// 计算文件hash
-export async function calculateFileHash(fileStream: fileIo.Stream, size: number): Promise<string> {
-  try {
-    const sha256 = cryptoFramework.createMd('MD5');
-    const bufferSize = 4096;
-    let offset = 0;
+export async function sha256(buffer: ArrayBuffer) {
+  let mdAlgName = 'SHA256'; // 摘要算法名。
+  let md = cryptoFramework.createMd(mdAlgName);
+  // 数据量较少时，可以只做一次update，将数据全部传入，接口未对入参长度做限制。
+  await md.update({ data: new Uint8Array(buffer) });
+  let mdResult = await md.digest();
+  // console.info('Md result:' + mdResult.data);
+  let mdLen = md.getMdLength();
+  // console.info("md len: " + mdLen);
+  return Array.from(mdResult.data)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 
-    while (offset < size) {
-      const readSize = Math.min(bufferSize, size - offset);
-      const arrayBuffer = new ArrayBuffer(readSize);
-      // await fileIo.read(file.fd, arrayBuffer, { offset });
-      await fileStream.read(arrayBuffer, {offset: offset, length: readSize})
-      await sha256.update({ data: new Uint8Array(arrayBuffer) });
-      offset += readSize;
+async function computeHash(filePath: string, offset: number = 0, length?: number): Promise<string> {
+  let fd = await fileIo.open(filePath, fileIo.OpenMode.READ_ONLY); // 0 表示只读模式
+  try {
+    const hash = cryptoFramework.createMd('SHA1');
+
+    if (length === undefined) { // 完整文件校验逻辑
+      const bufferSize = 4096;
+      let readSize = 0;
+      do {
+        const buf = new ArrayBuffer(bufferSize);
+        readSize = await fileIo.read(fd.fd, buf, { offset });
+        if (readSize > 0) {
+          await hash.update({data: new Uint8Array(buf)});
+          offset += readSize;
+        }
+      } while (readSize > 0);
+    } else { // 片段校验逻辑
+      const buf = new ArrayBuffer(length);
+      await fileIo.read(fd.fd, buf, { offset: offset, length: length });
+      await hash.update({data: new Uint8Array(buf)});
     }
-    const hash = await sha256.digest();
-    // const textDecoder: util.TextDecoder = util.TextDecoder.create(); // 调用util模块的TextDecoder类
-    // const result: string = textDecoder.decodeToString(hash.data); // 对uint8Array解码
-    return Array.from(hash.data)
+
+    const digest = await hash.digest();
+    return Array.from(digest.data)
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
-  } catch (error) {
-    console.error('计算文件哈希出错:', (error as BusinessError).message);
-    return "";
+  } finally {
+    fileIo.close(fd);
   }
 }
+
+@Concurrent
+export async function Checksum(uri: string) {
+  let fd = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY); // 0 表示只读模式
+  try {
+    const hash = cryptoFramework.createMd('SHA1');
+    const bufferSize = 4096;
+    let readSize = 0;
+    let offset = 0
+    do {
+      const buf = new ArrayBuffer(bufferSize);
+      readSize = await fileIo.read(fd.fd, buf, { offset });
+      if (readSize > 0) {
+        await hash.update({data: new Uint8Array(buf)});
+        offset += readSize;
+      }
+    } while (readSize > 0);
+
+    const digest = await hash.digest();
+    return Array.from(digest.data)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  } finally {
+    fileIo.close(fd);
+  }
+}
+
+@Concurrent
+export async function preChecksum(uri: string, size: number) {
+  const fileSize = size;
+
+  let offset = 0;
+  let length = 1024;
+  if (fileSize >= 65536) {
+    offset = 65536 - 1024; // 64KB起始点
+  } else if (fileSize > 1024) {
+    offset = fileSize - 1024;
+  } else {
+    length = fileSize;
+  }
+  let fd: fileIo.File
+  try {
+    fd = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY); // 0 表示只读模式
+    const hash = cryptoFramework.createMd('SHA1');
+    const buf = new ArrayBuffer(length);
+    fileIo.readSync(fd.fd, buf, { offset: offset, length: length });
+    fileIo.close(fd);
+    hash.updateSync({ data: new Uint8Array(buf) });
+
+    const digest = hash.digestSync();
+    return Array.from(digest.data)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch(e) {
+    console.error(`打开文件或者计算哈希失败${uri}, code=${e.code}, msg=${e.message}`)
+    return ""
+  }
+}
+
+// // 计算文件hash
+// export async function calculateFileHash(fileStream: fileIo.Stream, size: number): Promise<string> {
+//   try {
+//     const sha256 = cryptoFramework.createMd('MD5');
+//     const bufferSize = 4096;
+//     let offset = 0;
+//
+//     while (offset < size) {
+//       const readSize = Math.min(bufferSize, size - offset);
+//       const arrayBuffer = new ArrayBuffer(readSize);
+//       // await fileIo.read(file.fd, arrayBuffer, { offset });
+//       await fileStream.read(arrayBuffer, {offset: offset, length: readSize})
+//       await sha256.update({ data: new Uint8Array(arrayBuffer) });
+//       offset += readSize;
+//     }
+//     const hash = await sha256.digest();
+//     // const textDecoder: util.TextDecoder = util.TextDecoder.create(); // 调用util模块的TextDecoder类
+//     // const result: string = textDecoder.decodeToString(hash.data); // 对uint8Array解码
+//     return Array.from(hash.data)
+//       .map(b => b.toString(16).padStart(2, '0'))
+//       .join('');
+//   } catch (error) {
+//     console.error('计算文件哈希出错:', (error as BusinessError).message);
+//     return "";
+//   }
+// }
 
 export function strip(str: string, trip: string) {
   return str.endsWith(trip) ? str.slice(0, -1) : str;
@@ -255,4 +354,43 @@ export async function checkWifi(config: Config) {
     }
   }
   return true;
+}
+
+// 清除tempUri下的所有文件
+export async function cleanTemp(tempUri: string): Promise<void> {
+  try {
+    // 获取目录下的文件列表
+    const files = await fileIo.listFile(tempUri);
+
+    // 遍历目录内容
+    for (const fileName of files) {
+      const childPath = `${tempUri}/${fileName}`;
+      try {
+        const stat = await fileIo.stat(childPath);
+
+        // 处理文件
+        if (stat.isFile()) {
+          await fileIo.unlink(childPath);
+        }
+        // 处理子目录
+        else if (stat.isDirectory()) {
+          await cleanTemp(childPath);    // 递归清理子目录
+          await fileIo.rmdir(childPath); // 删除空目录
+        }
+      } catch (err) {
+        console.error(`删除失败: ${childPath}`, (err as BusinessError).message);
+      }
+    }
+  } catch (err) {
+    console.error(`清理目录失败: ${tempUri}`, (err as BusinessError).message);
+  }
+}
+
+// 检查临时文件夹的用量，如果大于maxSize泽返回true，否则返回false
+export async function checkTempUsed(tempUri: string, maxSize: number = 209715200): Promise<boolean> {
+  let totalBytes = await statfs.getTotalSize(tempUri)
+  if (totalBytes >= maxSize) {
+    return true
+  }
+  return false
 }

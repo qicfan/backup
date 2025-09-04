@@ -1,7 +1,6 @@
 import { IBestNotify } from "@ibestservices/ibest-ui-v2";
 import { ServerConfig } from "../models/Server";
 import { AppStorageV2, ComponentContent, LevelMode, promptAction } from "@kit.ArkUI";
-import { common, WantAgent, wantAgent } from "@kit.AbilityKit";
 import { Global } from "../models/Global";
 import {
   ConfigGlobalStatus,
@@ -9,15 +8,17 @@ import {
 } from "../typing";
 import { Config } from "../models/Config";
 import { Login } from "../components/Login";
-import { WebDav } from "../utils/webdav";
 import { Privacy } from "../components/Privacy";
 import { TipDialog } from "../dialogs/TipDialog";
-import { Dialog } from "../utils/dialog";
 import { Agreement } from "../components/Agreement";
 import { Home } from "../components/Home";
-import { TaskUpload } from "../utils/taskUpload";
 import { BackGroundUtil } from "../utils/BackgroundUtil";
 import { TaskItemDetail } from "../components/TaskItemDetail";
+import { BackupServer } from "../utils/server";
+import { ServerPhotoItemDetail } from "../components/ServerPhotoItemDetail";
+import { TaskUpload } from "../utils/taskUpload";
+import { checkTempUsed, cleanTemp } from "../utils/tools";
+import { taskpool } from "@kit.ArkTS";
 
 @Builder
 function buildTip(params: TipDialogParams) {
@@ -29,7 +30,7 @@ class TipDialogParams {
   pageInfos: NavPathStack = new NavPathStack();
 
   constructor(event: (init: boolean) => void, pageInfos: NavPathStack) {
-    this.event = event;;
+    this.event = event;
     this.pageInfos = pageInfos;
   }
 }
@@ -39,7 +40,7 @@ class TipDialogParams {
 struct Index {
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
-  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
+  @Local backupServer: BackupServer = AppStorageV2.connect(BackupServer, "BackupServer", () => BackupServer.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Provider('pageInfos') pageInfos: NavPathStack = new NavPathStack();
   @Local creatingTask: boolean = false;
@@ -76,6 +77,14 @@ struct Index {
     console.log('进入首页')
     this.initApp().then((rs) => {
       if (!rs) return ;
+      let ctx = getContext(this)
+      const tempDir = ctx.tempDir
+      // checkTempUsed(tempDir).then((rs) => {
+      //   if (!rs) {
+      //     return
+      //   }
+      //   cleanTemp(tempDir).then(() => {})
+      // })
       console.log(`开始创建任务`);
       (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
     })
@@ -87,7 +96,7 @@ struct Index {
       console.log(`index 触发 后台任务`);
       (BackGroundUtil.getInstance()).startBackground();
     } else {
-      console.log(`index 触发 后台任务失败, ${this.global.processId}, ${canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")}`);
+      console.log(`index 未触发 后台任务, ${this.global.processId}, ${canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")}`);
     }
   }
 
@@ -124,17 +133,19 @@ struct Index {
     const serverExists = await this.server.queryAsset();
     if (!serverExists) {
       // 没有服务器配置
+      console.warn('找不到服务器设置，重新登录')
       this.init = 1;
       this.pageInfos.pushPath({ name: "login" })
       return false;
     }
     this.global.loginStatus = LoginStatus.NO_LOGIN;
     // 检查服务器是否可用
-    this.webdav.updateSerConfig(this.server);
-    const rs = await this.webdav.valid();
+    this.backupServer.updateConfig(this.server, this.config);
+    const rs = await this.backupServer.valid();
     if (!rs) {
       this.init = 1;
       // 登录失败，重新登录
+      console.warn('登录失败，重新登录')
       this.pageInfos.pushPath({ name: "login" });
       return false;
     }
@@ -176,6 +187,8 @@ struct Index {
       Agreement()
     } else if (name == "taskItemDetail") {
       TaskItemDetail()
+    } else if (name == "serverItemDetail") {
+      ServerPhotoItemDetail()
     }
   }
 

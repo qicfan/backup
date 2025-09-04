@@ -8,6 +8,7 @@ import { FolderSelectDialog } from "../dialogs/FolderSelectDialog";
 import { ServerConfig } from "../models/Server";
 import { Global } from "../models/Global";
 import { About } from "./About";
+import { TempClean } from "./TempClean";
 
 class Params {
   rootPath: string = ""
@@ -66,9 +67,15 @@ export struct Settings {
       onConfirm: (selectedValues) => {
         this.showBackupTypePopup = false
         if (selectedValues[0] == 'all') {
+          if (this.config.backupType == BackupType.NEW) {
+            // 如果以前是备份新的，现在是备份全部，则将最后备份时间置空
+            this.config.lastBackupTime = 0
+          }
           this.config.backupType = BackupType.ALL;
         } else {
           this.config.backupType = BackupType.NEW;
+          // 如果是改为备份新照片，则将最后备份时间修改为现在
+          this.config.lastBackupTime = Math.floor(Date.now() / 1000)
         }
         this.config.update();
       },
@@ -182,6 +189,8 @@ export struct Settings {
             .onClick(() => {
               this.pageInfos.pushPathByName("agreement", true);
             })
+
+          // TempClean()
 
           About()
 

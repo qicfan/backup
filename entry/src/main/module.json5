@@ -38,20 +38,6 @@
         ]
       }
     ],
-//    "extensionAbilities": [
-//      {
-//        "name": "EntryBackupAbility",
-//        "srcEntry": "./ets/entryformability/EntryFormAbility.ets",
-//        "type": "form",
-//        "exported": false,
-//        "metadata": [
-//          {
-//            "name": "ohos.extension.form",
-//            "resource": "$profile:form_config"
-//          }
-//        ]
-//      }
-//    ],
     "requestPermissions": [
       {
         "name": "ohos.permission.INTERNET",
@@ -65,6 +51,15 @@
       {
         "name": "ohos.permission.READ_IMAGEVIDEO",
         "reason": "$string:IMAGEVIDEO_reason",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility"
+          ]
+        }
+      },
+      {
+        "name": "ohos.permission.MEDIA_LOCATION",
+        "reason": "$string:MEDIA_LOCATION_reason",
         "usedScene": {
           "abilities": [
             "EntryAbility"

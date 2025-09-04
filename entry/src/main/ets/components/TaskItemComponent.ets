@@ -7,6 +7,7 @@ import { IBestLoading } from "@ibestservices/ibest-ui-v2";
 import { IBestSkeletonParagraph } from "@ibestservices/ibest-ui-v2";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
+import { WaitTaskItemDataSource } from "../models/TaskItemDataSource";
 
 @ComponentV2
 export struct TaskItemComponent {
@@ -36,6 +37,8 @@ export struct TaskItemComponent {
     3: Color.Red, // FAILED
   }
 
+  @Consumer("taskItemDataSource") data: WaitTaskItemDataSource = new WaitTaskItemDataSource();
+
   async aboutToAppear() {
     if (this.taskItem === null) {
       return
@@ -49,6 +52,8 @@ export struct TaskItemComponent {
 
     }).catch(() => {
       // 无法查询缩略图，图片可能已删除，显示默认
+      // 删除该项目
+      this.data.removeData(this.index)
     })
     this.updateIcon();
     if (this.taskItem.status !== TaskItemStatus.SUCCESS) {

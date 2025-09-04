@@ -3,10 +3,9 @@ import { AppStorageV2 } from "@kit.ArkUI";
 import { Global } from "../models/Global";
 import { pointer } from "@kit.InputKit";
 import { emitter } from "@kit.BasicServicesKit";
-import { WaitTaskItemDataSource } from "../models/TaskItemDataSource";
 import { Config } from "../models/Config";
-import { TaskUpload } from "../utils/taskUpload";
 import { TaskItem } from "../models/TaskItem";
+import { TaskUpload } from "../utils/taskUpload";
 
 
 @ComponentV2
@@ -24,19 +23,12 @@ export struct TaskBottom {
 
   async startTask() {
     const total = TaskItem.getWaitCount();
-    (TaskUpload.getInstance()).start(getContext(this), total);
+    (TaskUpload.getInstance()).start(total);
     // 定时更新进度
     this.handleId = setInterval(() => {
       // console.log(`task bottom 定期检查进度`)
       this.updateProgress();
     }, 1000);
-    emitter.once(Global.BACKUP_TASK_FINISH, () => {
-      this.updateProgress();
-      if (this.handleId) {
-        clearInterval(this.handleId);
-        this.handleId = null;
-      }
-    })
     emitter.once(Global.STOP_TASK_EVENT, () => {
       this.updateProgress();
       if (this.handleId) {

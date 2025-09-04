@@ -16,6 +16,8 @@ export class Config {
   @Trace auto: AUTOBackup = AUTOBackup.YES;
   @Trace first: number = 0;
   @Trace onlyWifi: OnlyWIFIBackup = OnlyWIFIBackup.YES;
+  accessToken: string = ""
+  lastBackupTime: number = 0
   updatedAt: number = 0;
   createdAt: number = 0;
   private db: DB | null = null;
@@ -49,6 +51,8 @@ export class Config {
         this.first = rs.getLong(rs.getColumnIndex("first"))
         this.updatedAt = rs.getLong(rs.getColumnIndex("updated_at"))
         this.createdAt = rs.getLong(rs.getColumnIndex("created_at"))
+        this.accessToken = rs.getString(rs.getColumnIndex("access_token"))
+        this.lastBackupTime = rs.getLong(rs.getColumnIndex("last_backup_time"))
         rs.close();
         if (this.backupRootPath == "") return 2;
         return 1;
@@ -58,6 +62,50 @@ export class Config {
       return 0;
     }
 
+  }
+
+  // 更新访问凭证
+  async updateAccessToken(token: string) {
+    this.accessToken = token
+    const updateBucket: relationalStore.ValuesBucket = {
+      "access_token": token,
+      "updated_at": Math.floor(Date.now() / 1000)
+    }
+    let predicates = new relationalStore.RdbPredicates("config");
+    try {
+      const rows = await this.db?.store?.update(updateBucket, predicates,
+        relationalStore.ConflictResolution.ON_CONFLICT_REPLACE);
+      if (this.backupRootPath !== "") {
+        return false;
+      }
+      console.info(`token Updated row count: ${rows}`);
+      return true;
+    } catch (err) {
+      console.error(`token Updated failed, code is ${err.code},message is ${err.message}`);
+      return false;
+    }
+  }
+
+  // 更新访问凭证
+  async updateLastBackupTime(time: number) {
+    this.lastBackupTime = time
+    const updateBucket: relationalStore.ValuesBucket = {
+      "last_backup_time": time,
+      "updated_at": Math.floor(Date.now() / 1000)
+    }
+    let predicates = new relationalStore.RdbPredicates("config");
+    try {
+      const rows = await this.db?.store?.update(updateBucket, predicates,
+        relationalStore.ConflictResolution.ON_CONFLICT_REPLACE);
+      if (this.backupRootPath !== "") {
+        return false;
+      }
+      console.info(`last_backup_time Updated row count: ${rows}`);
+      return true;
+    } catch (err) {
+      console.error(`last_backup_time Updated failed, code is ${err.code},message is ${err.message}`);
+      return false;
+    }
   }
 
   // 更新配置项
@@ -70,6 +118,7 @@ export class Config {
       "only_wifi_backup": this.onlyWifi,
       "auto": this.auto,
       "first": this.first,
+      "last_backup_time": this.lastBackupTime,
       "updated_at": Math.floor(Date.now() / 1000)
     };
     let predicates = new relationalStore.RdbPredicates("config");

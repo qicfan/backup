@@ -5,7 +5,6 @@ import { AppStorageV2 } from "@kit.ArkUI";
 import { TaskDoing } from "../typing";
 
 import { Config } from "../models/Config";
-
 import { TaskUpload } from "../utils/taskUpload";
 
 @ComponentV2

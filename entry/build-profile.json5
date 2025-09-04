@@ -8,7 +8,7 @@
     },
     "sourceOption": {
       "workers": [
-        './src/main/ets/workers/TaskWorker.ets',
+        './src/main/ets/workers/UploadWorker.ets',
       ]
     }
   },

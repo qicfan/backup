@@ -2,24 +2,22 @@ import { IBestDialog, IBestLoading, IBestNotify } from "@ibestservices/ibest-ui-
 import { BusinessError, deviceInfo } from "@kit.BasicServicesKit"
 import { SafeArea } from "../utils/safeArea";
 import { AppStorageV2, EditableLeftIconType, EditableTitleBar, EditableTitleBarMenuItem } from "@kit.ArkUI";
-import { RequestReturn, WebDav, WebDavResource } from "../utils/webdav";
 import { ServerConfig } from "../models/Server";
 import { Dialog } from "../utils/dialog";
 import { Config } from "../models/Config";
 import { Global } from "../models/Global";
 import { ConfigGlobalStatus } from "../typing";
-import { strip } from "../utils/tools";
-import { url } from "@kit.ArkTS";
+import { BackupServer, DirItem } from "../utils/server";
 
 @ComponentV2
 export struct FolderSelectDialog {
   @Param rootPath: string = ""
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
-  @Local webdav: WebDav = AppStorageV2.connect(WebDav, "webdav", () => WebDav.getInstance())!;
+  @Local backupServer: BackupServer = AppStorageV2.connect(BackupServer, "BackupServer", () => BackupServer.getInstance())!;
   @Local safeArea: SafeArea = AppStorageV2.connect(SafeArea, () => SafeArea.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
-  @Local dirList: WebDavResource[] = [];
+  @Local dirList: DirItem[] = [];
   @Local path: string = ""
   @Local init: boolean = true;
 
@@ -27,8 +25,7 @@ export struct FolderSelectDialog {
   @Local formInputError: boolean = false
   @Local newDirDialog: boolean = false;
 
-  private deviceName = encodeURIComponent(deviceInfo.marketName);
-  private basePath: string = ""
+  private deviceName = deviceInfo.marketName;
 
   menu: EditableTitleBarMenuItem = {
     value: $r('sys.media.ohos_ic_public_add'), isEnabled: true, action: () => {this.newDirDialog = true;}
@@ -52,89 +49,98 @@ export struct FolderSelectDialog {
   }
 
   aboutToAppear() {
-    let urlObj = url.URL.parseURL(this.server.server)
-    this.basePath = urlObj.pathname
     let path = this.rootPath;
-    path = path.replace(this.basePath, "")
-    path = path.replace('/'+ this.deviceName + '/', '')
-    if (path == '/') {
-      path = ''
-    }
-    if (!path.endsWith('/')) {
-      path += '/'
+    if (!path) {
+      path = ""
+    } else {
+      path = path.replace('/' + this.deviceName, '')
     }
     this.path = path
     console.log(`已选路径：${this.path}`)
-    this.webdav.getDirs(this.path).then((rr) => {
-      this.dirList = rr.data ? rr.data : [];
+    this.backupServer.dirList(this.path).then((rr) => {
+      this.dirList = rr
       this.init = false;
     }).catch(() => {
       this.init = false;
     })
   }
 
-  changeDir(href: string) {
-    if (this.basePath !== "" && this.basePath !== '/') {
-      href = href.replace(this.basePath, "")
-      console.log(`change dir, href replaced: ${href}`)
+  changeDir(name: string) {
+    if (this.path == "") {
+      this.path = name
+    } else {
+      this.path += '/' + name;
     }
-    this.path = href;
-    if (!this.path.endsWith('/')) {
-      this.path += '/'
-    }
-    this.webdav.getDirs(href).then((rr) => {
-      this.dirList = rr.data ? rr.data : [];
+    console.log(`切换到路径：${this.path}`)
+    this.backupServer.dirList(this.path).then((rr) => {
+      this.dirList = rr
     }).catch(() => {
     })
   }
-
+  // 后退目录
   onCancel() {
-    this.path = strip(this.path, '/')
     if (this.path === "/" || this.path === "") {
       Dialog.closeDialog();
       return true;
     } else {
       // this.path = this.rootPath
       let dl = this.path.split('/')
-      dl.pop()
-      this.path = dl.join('/')
+      dl.pop() // 去掉当前目录
+      let name = ""
+      if (dl.length >= 1) {
+        let n = dl.pop() // 拿到上一级目录的名字
+        if (n) {
+          name = n
+        }
+        this.path = dl.join('/') // 当前目录改为上上级目录
+      } else {
+        name = ""
+        this.path = ""
+      }
+
       console.log(`onCancel: ${this.path}`)
-      this.changeDir(this.path)
+      this.changeDir(name)
       return false;
     }
   }
 
   onSave() {
     let path = this.path
-    if (!path.endsWith('/')) {
-      path += '/';
+    if (path == "") {
+      path = this.deviceName
+    } else {
+      path += '/' + this.deviceName
     }
-    path += this.deviceName + '/';
-    this.config.backupRootPath = path;
-    this.config.update().then(() => {
-      // 在服务器上创建目录
-      try {
-        this.webdav.mkDir(path).then((rr: RequestReturn) => {
-          if (rr.success) {
+    // 在服务器上创建目录
+    try {
+      this.backupServer.createDir(this.path, this.deviceName).then((resp) => {
+        if (!resp || !resp.success || !resp.result) {
+          console.warn(`创建目录 ${this.path}/${this.deviceName} 时失败：${resp.message}`)
+          return
+        }
+        let newPath = resp.result.data.path
+        if (newPath != "") {
+          this.config.backupRootPath = path;
+          this.config.update().then(() => {
             this.global.configGlobalStatus = ConfigGlobalStatus.YES;
             Dialog.closeDialog();
-          } else {
-            IBestNotify.show({
-              message: rr.message,
-              duration: 3000,
-              type: 'warning'
-            });
-          }
-        })
-      } catch (error) {
-        const err = error as BusinessError;
-        IBestNotify.show({
-          message: err.message,
-          duration: 3000,
-          type: 'warning'
-        });
-      }
-    })
+          })
+        } else {
+          IBestNotify.show({
+            message: resp.message,
+            duration: 3000,
+            type: 'warning'
+          });
+        }
+      })
+    } catch (error) {
+      const err = error as BusinessError;
+      IBestNotify.show({
+        message: err.message,
+        duration: 3000,
+        type: 'warning'
+      });
+    }
   }
 
   build() {
@@ -151,7 +157,7 @@ export struct FolderSelectDialog {
       Column() {
         if(!this.init) {
           List({ space: 20, initialIndex: 0 }) {
-            ForEach(this.dirList, (item: WebDavResource) => {
+            ForEach(this.dirList, (item: DirItem) => {
               ListItem() {
                 Flex({ direction: FlexDirection.Row, alignItems: ItemAlign.Center }) {
                   Image($r("app.media.folder_fill"))
@@ -159,7 +165,7 @@ export struct FolderSelectDialog {
                     .height(24)
                     .margin({ right: $r("app.float.inner_padding") })
                     .fillColor($r('app.color.ibest_primary_color'))
-                  Text('' + item.displayName)
+                  Text('' + item.name)
                     .fontSize(16)
                     .textAlign(TextAlign.Center)
                     .borderRadius(10)
@@ -169,9 +175,9 @@ export struct FolderSelectDialog {
                 .width('100%')
               }
               .onClick(() => {
-                this.changeDir(item.href)
+                this.changeDir(item.name)
               })
-            }, (item: WebDavResource) => item.href)
+            }, (item: DirItem) => item.relPath)
           }
           .listDirection(Axis.Vertical) // 排列方向
           .scrollBar(BarState.Off)
@@ -196,10 +202,10 @@ export struct FolderSelectDialog {
 
       Column() {
         if (this.path == "/" || this.path == "") {
-          Text(`已选路径：/${this.deviceName}`)
+          Text(`已选路径：${this.deviceName}`)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
         } else {
-          Text(`已选路径：${this.path}${this.deviceName}`)
+          Text(`已选路径：${this.path}/${this.deviceName}`)
             .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
         }
       }
@@ -226,20 +232,15 @@ export struct FolderSelectDialog {
           }
           const valueLength = this.newDirName.trim().length
           this.formInputError = !valueLength
-          let path = this.path
-          if (!path.endsWith('/')) {
-            path += '/'
-          }
-          path += this.newDirName + '/'
           try {
-            this.webdav.mkDir(path).then((rs) => {
+            this.backupServer.createDir(this.path, this.newDirName).then((rs) => {
               if (rs.success) {
                 IBestNotify.show({
                   message: "已切换到新建的目录",
                   duration: 3000,
                   type: 'success'
                 })
-                this.changeDir(path);
+                this.changeDir(this.newDirName);
               } else {
                 IBestNotify.show({
                   message: rs.message,

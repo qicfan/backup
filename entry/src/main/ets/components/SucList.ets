@@ -1,22 +1,22 @@
 import { CommonConstants } from "../common/CommonConstants";
-import { TaskItem } from "../models/TaskItem"
-import { TaskItemComponent } from "./TaskItemComponent";
-import { IBestEmpty } from "@ibestservices/ibest-ui-v2";
+import { IBestEmpty, IBestNotify } from "@ibestservices/ibest-ui-v2";
 import { SucTaskItemDataSource } from "../models/TaskItemDataSource";
 import { WinBreakpoint } from "../common/WinBreakpoint";
 import { AppStorageV2 } from "@kit.ArkUI";
 import { Global } from "../models/Global";
+import { BackupServer, ServerPhotoItem } from "../utils/server";
+import { ServerPhotoItemComponent } from "./ServerPhotoItemComponent";
 
 @ComponentV2
 export struct SucList {
   @Local isRefreshing: boolean = false;
   @Local isLoading: boolean = false;
-  @Local total: number = 0;
   @Local winBP: WinBreakpoint =
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
+  @Local backupServer: BackupServer = AppStorageV2.connect(BackupServer, "BackupServer", () => BackupServer.getInstance())!;
   @Provider("taskItemDataSource") data: SucTaskItemDataSource = new SucTaskItemDataSource();
-
+  @Local total: number = 0
   private scroller: Scroller = new Scroller();
   page: number = 1;
   pageSize: number = 50;
@@ -25,31 +25,39 @@ export struct SucList {
   }
 
   async getList(page: number = 1) {
-    if (page === 1) {
-      this.total = this.data.totalCount();
+    this.page = page
+    console.log('刷新列表：page=' + page)
+    this.isLoading = true
+    let resp = await this.backupServer.photoList(page, this.pageSize)
+    this.isLoading = false
+    if (!resp || !resp.success || !resp.result) {
+      console.warn(`查询照片列表失败，错误：${resp?.message}`)
+      IBestNotify.show({
+        message: resp.message,
+        duration: 3000,
+        type: 'warning'
+      });
+      return
     }
-    this.page = page;
-    // 查询未备份照片列表
-    const items = await TaskItem.getSuccessList(page, this.pageSize)
+    this.total = resp.result.data.total
+    // this.data.setTotalCount(resp.result.data.total)
     if (this.page === 1) {
       this.data.clearData();
+      console.log('已清空列表')
     }
-    this.data.addData(items);
+    this.data.addData(resp.result.data.photos);
     if (this.page === 1) {
       this.data.notifyDataReload();
     }
   }
 
   get hasMore(): boolean {
-    if (this.data.totalCount() >= this.total) return false;
+    console.log(`hasMore: ${this.total} ${(this.page-1) * this.pageSize}`)
+    if (this.total <= (this.page - 1) * this.pageSize) return false;
     return true;
   }
 
   onRefresh(direction: string) {
-    // if (this.global.processId > 0) {
-    //   this.isRefreshing = false;
-    //   return ;
-    // }
     if (direction === 'pull') {
       this.getList(1).then(() => {
         this.isRefreshing = false;
@@ -64,14 +72,14 @@ export struct SucList {
 
   build() {
     Column() {
-      Refresh({ refreshing: $$this.isRefreshing, promptText: "下拉刷新待备份列表"}) {
+      Refresh({ refreshing: $$this.isRefreshing, promptText: "下拉刷新"}) {
         if (this.total > 0) {
           Grid(this.scroller) {
-            LazyForEach(this.data, (item: TaskItem, index: number) => {
+            LazyForEach(this.data, (item: ServerPhotoItem, index: number) => {
               GridItem() {
-                TaskItemComponent({ taskItem: item, index: index })
+                ServerPhotoItemComponent({ serverPhotoItem: item, index: index })
               }
-            }, (item: TaskItem) => item ? item.id + '' : "0")
+            }, (item: ServerPhotoItem) => item.path)
           }
           .margin($r('app.float.normal_padding'))
           .cachedCount(10)
@@ -85,7 +93,7 @@ export struct SucList {
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
           .scrollBar(BarState.Auto)
           .onScrollIndex((start: number, end: number) => {
-            if (!this.hasMore) return ;
+            if (!this.hasMore) return;
             if (end < this.data.totalCount() - 1) return;
             this.isLoading = true;
             this.getList(this.page + 1).then(() => {

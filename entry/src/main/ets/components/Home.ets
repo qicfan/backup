@@ -7,9 +7,6 @@ import { TabItem } from "../typing";
 import { WaitList } from "./WaitList";
 import { SucList } from "./SucList";
 import { Global } from "../models/Global";
-import { emitter } from "@kit.BasicServicesKit";
-import { TaskUpload } from "../utils/taskUpload";
-import { TaskBottom } from "./TaskBottom";
 
 
 @ComponentV2
@@ -23,7 +20,7 @@ export struct Home {
 
   tabItems: Array<TabItem> = [
     { icon: $r('app.media.house'), selectedIcon: $r('app.media.house_fill'), name: "待备份" },
-    { icon: $r('app.media.checkmark_circle'), selectedIcon: $r('app.media.checkmark_circle_fill'), name: "已备份" },
+    { icon: $r('app.media.checkmark_circle'), selectedIcon: $r('app.media.checkmark_circle_fill'), name: "云相册" },
     { icon: $r('app.media.gearshape'), selectedIcon: $r('app.media.gearshape'), name: "设置" }
   ]
 

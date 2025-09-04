@@ -1,34 +1,19 @@
-## 鸿蒙5.0 鸿蒙Next(HarmonyOS Next) 相册备份 使用webdav协议备份到NAS
-#### 交流Q群：1055648718
+## 鸿蒙5.0 鸿蒙Next(HarmonyOS Next) 相册备份
+### 使用websocket协议备份图库到NAS，从NAS下载照片到本地，支持动态照片
+### 交流Q群：1055648718
 
-#### 上架失败：应用商店觉得功能单一，用户体验不好。
-#### 测试版本链接：[https://appgallery.huawei.com/link/invite-test-wap?taskId=cd1d1a840df25d887bc6676cea7b8308](https://appgallery.huawei.com/link/invite-test-wap?taskId=6ba7bd8c12fe21f814cff6c8330f4010)
+#### 测试版本链接：[https://appgallery.huawei.com/link/invite-test-wap?taskId=cd1d1a840df25d887bc6676cea7b8308](https://appgallery.huawei.com/link/invite-test-wap?taskId=32426665c9a9272992ac2dd355410222)
 #### 基于5.0.4(API 16)，请确保您设备的系统版本大于等于该版本
+#### 本项目为客户端，需要部署服务端才能使用：[https://github.com/qicfan/backup-server](https://github.com/qicfan/backup-server)
 
-### v1.0.0
+### TODO LIST
 - [x] 使用关键资产存储服务器、用户名、密码
 - [x] 使用关系型数据库存储数据
-- [x] 使用rcp库实现的webdav协议（查询文件夹列表、查询属性、上传），
+- [x] 使用websocket协议传输文件，并发5个线程
 - [x] 使用长时任务执行备份
 - [x] 低电量停止备份
 - [x] 仅wifi备份
 - [x] 任务手动启停
-- [x] 增加自动备份的设置
-- [x] 设置页面增加隐私协议
-- [x] 动态图支持（上传图片+视频），会将图片同名的mp4视频上传到图片同级目录
-- [x] 查看任务失败文件列表
-- [x] APP备案
-- [x] 软著源码
-- [x] 软著说明书
-- [x] 申请电子版权证书和软著
-### v1.1.0
-- [x] 多线程并发上传（加快备份速度，内网基本不担心网络稳定和带宽）
-- [x] 大文件分块上传-经测试request.uploadFile上传大文件不会导致内存占用过高，所以不需要分块上传
-- [x] 解决从相册导出大文件慢会导致后台任务退出的问题（长时间没有网络传输）-改为只有在应用退后台时才申请长时任务，并且将文件复制采用了多线程处理，基本没有复现过该问题。
-### V1.2.0
-- [x] 修改应用页面结构(单页应用无法上架)，改为Tab导航： 待备份、已备份、设置三个页面
-- [x] 待备份、已备份都显示缩略图列表（需要适配手机、平板、PC设备的尺寸）
-
-### V1.3.0（暂时放弃）
-- [ ] 连拍图支持
-- [ ] 桌面卡片（看情况实现，目前有问题）
+- [x] 将备份服务器的照片保存到本地相册
+- [x] 支持将apple的动态照片转码成jpg+mp4保存到鸿蒙相册
+- [x] 支持带exif信息的照片备份

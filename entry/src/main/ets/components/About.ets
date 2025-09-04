@@ -23,7 +23,12 @@ export struct About {
           right: $r('app.float.normal_padding'),
         })
       Column() {
-        Text("开源仓库: https://github.com/qicfan/backup")
+        Text("APP仓库: https://github.com/qicfan/backup")
+          .width('100%')
+          .textAlign(TextAlign.Start)
+          .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
+          .fontColor($r("app.color.ibest_field_prefix_font_color"))
+        Text("服务端仓库: https://github.com/qicfan/backup-server")
           .width('100%')
           .textAlign(TextAlign.Start)
           .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
@@ -38,7 +43,7 @@ export struct About {
           .textAlign(TextAlign.Start)
           .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
           .fontColor($r("app.color.ibest_field_prefix_font_color"))
-        Text("基于IBest-UI构建")
+        Text("UI基于IBest-UI构建")
           .width('100%')
           .textAlign(TextAlign.Start)
           .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
@@ -59,6 +64,6 @@ export struct About {
       left: $r('app.float.normal_padding'),
       right: $r('app.float.normal_padding')
     })
-    .backgroundColor($r("app.color.ibest_background"))
+    // .backgroundColor($r("app.color.ibest_background"))
   }
 }
