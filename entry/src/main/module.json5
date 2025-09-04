@@ -58,6 +58,15 @@
         }
       },
       {
+        "name": "ohos.permission.MEDIA_LOCATION",
+        "reason": "$string:MEDIA_LOCATION_reason",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility"
+          ]
+        }
+      },
+      {
         "name": "ohos.permission.STORE_PERSISTENT_DATA",
         "reason": "$string:PERSISTENT_reason",
         "usedScene": {

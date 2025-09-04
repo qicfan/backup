@@ -47,6 +47,10 @@
     {
       "name": "backupWidget_display_name",
       "value": "备份按钮"
+    },
+    {
+      "name": "MEDIA_LOCATION_reason",
+      "value": "用户获取照片的详细信息，如：地理位置"
     }
   ]
 }

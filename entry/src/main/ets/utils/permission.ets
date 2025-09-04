@@ -27,11 +27,17 @@ export async function checkPermissionGrant(permission: Permissions): Promise<abi
   return grantStatus;
 }
 
-export async function checkPermissions(context: common.UIAbilityContext, p: Permissions): Promise<boolean> {
-  let grantStatus1: boolean = await checkPermissionGrant(p) === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;// 获取精确定位权限状态
+export async function checkPermissions(context: common.UIAbilityContext, p: Permissions[]): Promise<boolean> {
+  let waitReqPermissions: Permissions[] = []
+  for (let i=0; i<p.length; i++) {
+    let grantStatus1: boolean = await checkPermissionGrant(p[i]) === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;
+    if (!grantStatus1) {
+      waitReqPermissions.push(p[i])
+    }
+  }
   // 精确定位权限只能跟模糊定位权限一起申请，或者已经有模糊定位权限才能申请精确定位权限
-  if (!grantStatus1) {
-    return await reqPermissionsFromUser(context, [p])
+  if (waitReqPermissions.length > 0) {
+    return await reqPermissionsFromUser(context, waitReqPermissions)
   }
   return true
 }

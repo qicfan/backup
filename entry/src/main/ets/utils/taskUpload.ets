@@ -85,7 +85,7 @@ export class TaskUpload {
 
   checkPerm(): Promise<boolean> {
     return new Promise((resolve) => {
-      checkPermissions(getContext() as common.UIAbilityContext, 'ohos.permission.READ_IMAGEVIDEO').then((rs) => {
+      checkPermissions(getContext() as common.UIAbilityContext, ['ohos.permission.READ_IMAGEVIDEO', 'ohos.permission.MEDIA_LOCATION']).then((rs) => {
         if (rs) {
           resolve(true)
         } else {
