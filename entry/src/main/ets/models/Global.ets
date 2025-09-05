@@ -9,6 +9,7 @@ export class Global {
   @Trace processId: number = 0; // 运行中的任务
   @Trace tabIndex: number = 0; // tab导航当前选中的页面
   @Trace preTotal: number = 0;
+  @Trace idx: number = 0 // 收集的照片的数量
 
   private static _instance: Global | null = null;
 

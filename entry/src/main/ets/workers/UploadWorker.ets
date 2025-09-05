@@ -4,7 +4,6 @@ import { fileIo } from '@kit.CoreFileKit';
 import { webSocket } from '@kit.NetworkKit';
 import { ApiResponse, PathItem } from '../utils/server';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { sha256 } from '../utils/tools';
 
 interface FileChunk {
   fileName: string
@@ -16,7 +15,7 @@ interface FileChunk {
   size: number
   chunkIndex: number
   chunkCount: number
-  chunkHash: string
+  checksum: string
 }
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
 const CHUNK_SIZE = 100 * 1024 // 100kb
@@ -53,25 +52,50 @@ async function doUpload(uploadFile: UploadEvent) {
   }
   // console.log(`文件 ${uploadFile.path}打开成功，文件大小 ${stat.size}`)
   let fileSize = stat.size;
-  let chunkCount = Math.ceil(fileSize / CHUNK_SIZE);
-  // console.log(`${uploadFile.path} 文件大小 ${fileSize}，分片数量: ${chunkCount}`)
+  let chunkSize = CHUNK_SIZE
+
+  let chunkCount = Math.ceil(fileSize / chunkSize);
+  console.log(`${uploadFile.path} 文件大小 ${stat.size}, 分片大小: ${chunkSize}, 分片数量: ${chunkCount}`)
   let wsObj = await connectWs(uploadFile)
+  wsObj.on('message', (err: BusinessError<void>, data: string | ArrayBuffer) => {
+    try {
+      // console.log('ws message: ' + data as string)
+      let resp = JSON.parse(data as string) as ApiResponse<PathItem>;
+      if (resp.code == 3) {
+        // 服务端出现错误需要断开连接重连
+        console.log(`服务端出现错误，需要重连：${resp.message}`)
+        wsObj.close()
+        ws = undefined
+        workerPort.postMessage(resp)
+      }
+      if (resp.code === 0 && resp.message === '上传完成') {
+        console.log('上传完成:', uploadFile.path, resp.data);
+        // 通知主线程
+        workerPort.postMessage(resp)
+      } else if (resp.code === 1) {
+        console.error('分片校验失败:', resp.message, resp.data);
+        workerPort.postMessage(resp)
+      }
+    } catch (e) {
+      // console.log('收到消息:', data as string);
+    }
+  });
   // 启动定时器测速
   SI = setInterval(() => {
     if (CURRENT_SIZE === 0 && LAST_SIZE === 0) {
       return
     }
     let size = (CURRENT_SIZE - LAST_SIZE) * 2 // 速度，字节
-    // console.log(`文件 ${uploadFile.fileUri} 当前进度：${CURRENT_SIZE}, ${LAST_SIZE}/${fileSize}, 速度: ${size}`)
     PROGRESS = Math.floor(CURRENT_SIZE / fileSize * 100)
     let rs: ApiResponse<number[]> = {code: 2, message: "", data: [size, CURRENT_SIZE, PROGRESS]}
     workerPort.postMessage(rs)
     LAST_SIZE = CURRENT_SIZE
   }, 500)
+  // 循环发送数据帧
   for (let i = 0; i < chunkCount; i++) {
     // console.log(`开始上传分片: ${uploadFile.path} => ${i}`)
-    let start = i * CHUNK_SIZE;
-    let end = Math.min(start + CHUNK_SIZE, fileSize);
+    let start = i * chunkSize;
+    let end = Math.min(start + chunkSize, fileSize);
     // console.log(`分片 ${i} Start ${start}, End ${end}`)
     let buffer = new ArrayBuffer(end - start);
     try {
@@ -82,23 +106,19 @@ async function doUpload(uploadFile: UploadEvent) {
       fileIo.closeSync(file.fd)
       return
     }
-    // console.log(`分片 ${i} 读取文件完成`)
     let chunk: FileChunk = {
       fileName: uploadFile.path,
-      type: 1, // 普通照片，按需调整
+      type: uploadFile.type, // 普通照片，按需调整
       live_photo_video_path: uploadFile.live_photo_video_path,
       mtime: Math.floor(stat.mtime / 1000),
       ctime: Math.floor(stat.ctime / 1000),
       fileUri: '',
       size: fileSize,
-      chunkIndex: i,
       chunkCount: chunkCount,
-      chunkHash: await sha256(buffer),
+      checksum: uploadFile.checksum,
+      chunkIndex: i
     };
-    // console.log(`分片 ${i} 数据: ${JSON.stringify(chunk)}`)
-
     await wsObj.send(JSON.stringify(chunk)); // 先发JSON帧
-    // console.log(`发送分片 ${i} 的数据帧，数据长度：${buffer.byteLength}`)
     await wsObj.send(buffer); // 再发二进制分片数据
     CURRENT_SIZE = end
   }
@@ -109,7 +129,6 @@ async function doUpload(uploadFile: UploadEvent) {
     SI = 0
   }
   fileIo.closeSync(file.fd);
-
 }
 
 async function connectWs(uploadFile: UploadEvent): Promise<webSocket.WebSocket> {
@@ -136,22 +155,6 @@ async function connectWs(uploadFile: UploadEvent): Promise<webSocket.WebSocket> 
       ws = wsTmp
       // console.log(`ws 连接成功：${server}`)
       resolve(ws)
-    });
-    wsTmp.on('message', (err: BusinessError<void>, data: string | ArrayBuffer) => {
-      try {
-        // console.log('ws message: ' + data as string)
-        let resp = JSON.parse(data as string) as ApiResponse<PathItem>;
-        if (resp.code === 0 && resp.message === '上传完成') {
-          console.log('上传完成:', uploadFile.path, resp.data);
-          // 通知主线程
-          workerPort.postMessage(resp)
-        } else if (resp.code === 1) {
-          console.error('分片校验失败:', resp.message, resp.data);
-          workerPort.postMessage(resp)
-        }
-      } catch (e) {
-        // console.log('收到消息:', data as string);
-      }
     });
     wsTmp.on('error', (err) => {
       console.error('WebSocket error:', JSON.stringify(err));

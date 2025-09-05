@@ -20,7 +20,7 @@ export struct TaskCheck {
       IBestButton({
         text: '开始备份',
         type: this.global.taskGlobalStatus === TaskDoing.YES ? 'default' : 'primary',
-        loadingText: this.loadingText,
+        loadingText: this.loadingText + ', 已收集：' + this.global.idx,
         loading: this.global.taskGlobalStatus == TaskDoing.YES
       })
         .onClick(() => {

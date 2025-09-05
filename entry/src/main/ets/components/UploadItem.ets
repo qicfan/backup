@@ -119,6 +119,7 @@ export struct UploadItem {
         token: token,
         server: this.server.server,
         live_photo_video_path: this.config.backupRootPath !== "" ? this.config.backupRootPath + '/' + item.remoteVideoUri : item.remoteVideoUri,
+        checksum: item.checksum
       }
       await this.upload(item, uploadEvent, false)
 
@@ -128,7 +129,8 @@ export struct UploadItem {
         fileUri: item.videoUri,
         token: token,
         server: this.server.server,
-        live_photo_video_path: ""
+        live_photo_video_path: "",
+        checksum: ""
       }
       this.fileName = splitFileExt(item.name)[1] + '.mp4'
       this.fileSize = item.videoSize
@@ -148,7 +150,8 @@ export struct UploadItem {
         fileUri: item.uri,
         token: token,
         server: this.server.server,
-        live_photo_video_path: ""
+        live_photo_video_path: "",
+        checksum: item.checksum
       }
       await this.upload(item, uploadEvent, false)
     }

@@ -9,6 +9,9 @@ import { fileIo } from "@kit.CoreFileKit";
 import { BackupServer } from "./server";
 import { ServerConfig } from "../models/Server";
 import { Config } from "../models/Config";
+import { taskpool } from "@kit.ArkTS";
+import { TaskItemSendable } from "./TaskItemQueue";
+import { Global } from "../models/Global";
 
 export class Photos {
   /**
@@ -23,9 +26,16 @@ export class Photos {
     // 循环直到没有数据
     let predicates = new dataSharePredicates.DataSharePredicates();
     const offset = (page - 1) * pageSize;
-    predicates.limit(pageSize, offset).orderByDesc('date_added')
+    predicates.limit(pageSize, offset).orderByAsc('date_added')
     let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx);
     let fetchRs: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset>;
+    const group = new taskpool.TaskGroup();
+    let serverHost = ServerConfig.getInstance().server
+    let token = backupServer.getToken()
+    if (token === undefined) {
+      token = ""
+    }
+    let backupRootPath = Config.getInstance().backupRootPath
     try {
       fetchRs = await phAccessHelper.getAssets({
         fetchColumns: ['uri', 'display_name', 'media_type', 'subtype', 'date_added', 'date_modified', 'size', 'mime_type'],
@@ -39,63 +49,58 @@ export class Photos {
       console.log(`查询照片失败，code=${err.code}, msg=${err.message}`)
       return items;
     }
-      while (!fetchRs.isAfterLast()) {
-        let ps: photoAccessHelper.PhotoAsset;
-        try {
-          ps = await fetchRs.getNextObject()
-        } catch (e) {
-          let err = e as BusinessError;
-          console.log(`获取photo assets失败，code=${err.code}, msg=${err.message}`)
-          continue
-        }
-        const item = new TaskItem()
-        item.dateAdded = ps.get('date_added') as number;
-        // console.log(`是否跳过文件，文件添加时间戳：${item.dateAdded}, 最后一次备份时间：${lastTimestamp}`)
-        if (item.dateAdded < lastTimestamp) {
-          continue;
-        }
-        item.uri = ps.uri;
-        item.photoType = ps.photoType as number;
-        item.subType = ps.get('subtype') as number;
-        item.name = ps.displayName;
-        item.createdAt = ps.get('date_modified') as number;
-        item.size = ps.get('size') as number;
-        item.status = TaskItemStatus.WAIT;
-        item.makeUri(ctx);
-        // let realPath = item.remoteUri
-        //1. 先通过path判断是否存在
-        let exists = await backupServer.exists(item.remoteUri, false, true)
-        if (exists) {
-          continue
-        } else {
-          console.log(`通过path查询到文件没有备份：${item.remoteUri}`)
-        }
-        //2. 通过uri查询是否存在
-        exists = await backupServer.exists(ps.uri, true, false, item.size)
-        if (exists) {
-          continue
-        } else {
-          console.log(`通过fileUri查询到文件没有备份：${item.uri}`)
-        }
-        //3. 使用checksum来判断是否存在
-        exists = await backupServer.checksumExists(ps.uri)
-        if (exists) {
+    let taskTotal = 0
+    while (!fetchRs.isAfterLast()) {
+      let ps: photoAccessHelper.PhotoAsset;
+      try {
+        ps = await fetchRs.getNextObject()
+      } catch (e) {
+        let err = e as BusinessError;
+        console.log(`获取photo assets失败，code=${err.code}, msg=${err.message}`)
+        continue
+      }
+      const item = new TaskItem()
+      item.dateAdded = ps.get('date_added') as number;
+      console.log(`是否跳过文件，文件添加时间戳：${item.dateAdded}, 最后一次备份时间：${lastTimestamp}`)
+      if (item.dateAdded < lastTimestamp) {
+        // console.log(`跳过文件`)
+        continue;
+      }
+      Global.getInstance().idx ++
+      item.uri = ps.uri;
+      item.photoType = ps.photoType as number;
+      item.subType = ps.get('subtype') as number;
+      item.name = ps.displayName;
+      item.createdAt = ps.get('date_modified') as number;
+      item.size = ps.get('size') as number;
+      item.status = TaskItemStatus.WAIT;
+      item.makeUri(ctx);
+      // 放入taskpool里处理
+      let itemSendable = TaskItemSendable.getInstance(item, serverHost, token, backupRootPath, Global.getInstance().idx)
+      // console.log(`已生成TaskItemSendable`)
+      group.addTask(CheckUriExistsOnServer, itemSendable)
+      // console.log(`已加入Taskpool任务组`)
+      taskTotal ++
+    }
+    fetchRs.close();
+    if (taskTotal > 0) {
+      let result: Array<Object | undefined> = await taskpool.execute(group)
+      for (let i = 0; i < result.length; i++) {
+        let itemSendable = result[i] as TaskItemSendable | undefined
+        if (itemSendable === undefined) {
           continue
         } else {
-          console.log(`通过checksum查询到文件没有备份: ${item.remoteUri}`)
-        }
-        const rs = await item.save();
-        if (rs) {
-          items.push(item);
+          itemSendable.save()
+          items.push(itemSendable.getItem())
         }
       }
-    fetchRs.close();
+    }
     return items;
   }
 
   // 通过uri获取PhotoAsset做进一步的展示
   static async getPhotoAssetByUri(ctx: Context, uri: string): Promise<photoAccessHelper.PhotoAsset | undefined> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
       let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
       predicates.equalTo('uri', uri);
       let fetchOptions: photoAccessHelper.FetchOptions = {
@@ -114,7 +119,7 @@ export class Photos {
   }
 
   static async getMovingPhoto(context: Context, photoAsset: photoAccessHelper.PhotoAsset): Promise<photoAccessHelper.MovingPhoto> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       photoAccessHelper.MediaAssetManager.requestMovingPhoto(context, photoAsset, {
         deliveryMode: photoAccessHelper.DeliveryMode.FAST_MODE
       }, {
@@ -175,7 +180,7 @@ export class Photos {
         deliveryMode: photoAccessHelper.DeliveryMode.FAST_MODE,
       }
       try {
-        let requestId: string = await photoAccessHelper.MediaAssetManager.requestImage(ctx, asset, requestOptions, {
+        await photoAccessHelper.MediaAssetManager.requestImage(ctx, asset, requestOptions, {
           onDataPrepared: (imgSource: image.ImageSource) => {
             imgSource.createPixelMap().then((pm) => resolve(pm)).catch((err: BusinessError) => reject(err))
           }
@@ -428,6 +433,34 @@ export class Photos {
       }
     });
   }
+}
 
+@Concurrent
+async function CheckUriExistsOnServer(item: TaskItemSendable): Promise<TaskItemSendable | undefined> {
+  // //1. 先通过path判断是否存在
+  // let exists = await item.exists(item.remoteUri, false, true)
+  // if (exists) {
+  //   console.log(`通过path查询到文件已备份：${item.remoteUri}}`)
+  //   return undefined
+  // } else {
+  //   console.log(`通过path查询到文件没有备份：${item.remoteUri}`)
+  // }
+  // //2. 通过uri查询是否存在
+  // exists = await item.exists(item.uri, true, false)
+  // if (exists) {
+  //   console.log(`通过uri查询到文件已备份：${item.uri}}`)
+  //   return undefined
+  // } else {
+  //   console.log(`通过fileUri查询到文件没有备份：${item.uri}`)
+  // }
 
+  //3. 使用checksum来判断是否存在
+  let exists = await item.checksumExists()
+  if (exists) {
+    console.log(`通过checksum查询到文件已备份：${item.remoteUri}}`)
+    return undefined
+  } else {
+    console.log(`通过checksum查询到文件没有备份: ${item.remoteUri}`)
+  }
+  return item
 }

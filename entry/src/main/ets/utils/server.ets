@@ -3,7 +3,7 @@ import { http } from "@kit.NetworkKit";
 import { taskpool, url } from "@kit.ArkTS";
 import { BusinessError, emitter } from "@kit.BasicServicesKit";
 import { Config } from "../models/Config";
-import { Checksum, fileExists, filePathDir, preChecksum, splitFileExt, urlSafeBase64 } from "./tools";
+import { Checksum, fileExists, filePathDir, urlSafeBase64 } from "./tools";
 import { fileIo } from "@kit.CoreFileKit";
 import { Global } from "../models/Global";
 
@@ -124,14 +124,8 @@ export class BackupServer {
     } else {
       data["pathType"] = "2"
       data["path"] = pathOrFile
-      // console.log(`开始计算文件的sha1：${pathOrFile}`)
-      // 计算文件的preChecksum
-      // let prechecksum = await taskpool.execute(preChecksum, pathOrFile, size) as string
-      // console.log(`文件的sha1: ${prechecksum}`)
-      // header["X-Pre-Checksum"] = ""
     }
     let resp: HttpResp<PathExists> = await this.post<PathExists>("/api/exists", header, data)
-    // console.log(JSON.stringify(resp.result))
     if (!resp || !resp.success || !resp.result) {
       console.warn(`查询目录或文件 ${pathOrFile} 是否存在时失败：${resp.message}`)
       return false

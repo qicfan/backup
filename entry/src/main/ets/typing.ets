@@ -20,6 +20,7 @@ export interface UploadEvent {
   token: string // 访问凭证
   server: string // 服务器地址
   live_photo_video_path: string // 动态照片的视频的路径
+  checksum: string
 }
 
 export interface WorkerMessage {

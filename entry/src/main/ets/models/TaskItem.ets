@@ -1,14 +1,13 @@
-import { BackupType, TaskItemStatus } from "../typing";
+import { TaskItemStatus } from "../typing";
 import { intl } from '@kit.LocalizationKit';
 import { relationalStore } from "@kit.ArkData";
 import { DB } from "./DB";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
-import { splitFileExt, strip } from "../utils/tools";
+import { splitFileExt } from "../utils/tools";
 import { Config } from "./Config";
 import { common } from "@kit.AbilityKit";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { Photos } from "../utils/photos";
-import { ServerConfig } from "./Server";
 
 @ObservedV2
 export class TaskItem {
@@ -27,6 +26,7 @@ export class TaskItem {
   remoteVideoUri: string = "";
   photoType: photoAccessHelper.PhotoType = photoAccessHelper.PhotoType.IMAGE;
   subType: photoAccessHelper.PhotoSubtype = photoAccessHelper.PhotoSubtype.DEFAULT
+  checksum: string = ""
   @Trace status: TaskItemStatus = TaskItemStatus.WAIT;
   @Trace failedReason: string = '';
   @Trace thumbnail: PixelMap | null = null;
@@ -55,6 +55,7 @@ export class TaskItem {
     taskItem.uploadedAt = rs.getLong(rs.getColumnIndex('uploaded_at'))
     taskItem.dateAdded = rs.getLong(rs.getColumnIndex('date_added'))
     taskItem.dateModified = rs.getLong(rs.getColumnIndex('date_modified'))
+    taskItem.checksum = rs.getString(rs.getColumnIndex('checksum'))
     return taskItem;
   }
 
@@ -310,24 +311,11 @@ export class TaskItem {
    */
   static async createTask(ctx: Context, config: Config) {
     let lastTimestamp: number = config.lastBackupTime;
-    // if (config.backupType === BackupType.NEW) {
-    //   // 只备份新数据，开始时间是APP第一次打开时间
-    //   lastTimestamp = config.createdAt;
-    // }
-    // let predicates = new relationalStore.RdbPredicates(TaskItem.TABLE_NAME);
-    // predicates.orderByDesc('id').limitAs(1)
-    // const rs = await DB.getInstance().store?.query(predicates)
-    // console.log(`查询最后一条文件记录，返回数: ${rs?.rowCount}`)
-    // if (rs !== undefined && rs.rowCount > 0) {
-    //   rs.goToNextRow()
-    //   lastTimestamp = rs.getLong(rs.getColumnIndex('created_at'))
-    //   console.log(`查询到的最后一次的时间1：${lastTimestamp}`)
-    // }
-    // console.log(`查询到的最后一次的时间2：${lastTimestamp}`)
-    // rs?.close();
+
     let page = 1;
     const pageSize = 100;
     let total = 0;
+    let lastTime = 0
     while (true) {
       // 1. 收集相册内容，并且写入taskItem表
       const items = await Photos.getPhotos(ctx, lastTimestamp, page, pageSize)
@@ -340,10 +328,13 @@ export class TaskItem {
       if (items.length < pageSize) {
         break;
       }
+      lastTime = items[items.length - 1].dateAdded
+      if (lastTime > 0) {
+        // 修改最后备份时间
+        await config.updateLastBackupTime(lastTime)
+      }
       page++
     }
-    // 修改最后备份时间
-    await config.updateLastBackupTime(Math.floor(Date.now() / 1000))
     console.log(`生成的待备份总数：${total}`)
     return total > 0
   }
@@ -521,6 +512,7 @@ export class TaskItem {
       "uploaded_at": this.uploadedAt,
       "date_added": this.dateAdded,
       "date_modified": this.dateModified,
+      "checksum": this.checksum
     };
     try {
       await DB.getInstance().store?.insert(TaskItem.TABLE_NAME, insertBucket,

@@ -65,7 +65,8 @@ export class DB {
             "    date_added     INTEGER DEFAULT (0),\n" +
             "    date_modified     INTEGER DEFAULT (0),\n" +
             "    created_at INTEGER,\n" +
-            "    uploaded_at INTEGER\n" +
+            "    uploaded_at INTEGER,\n" +
+            "    checksum TEXT (512)\n" +
             ");";
           const dateNow = Math.floor(Date.now() / 1000);
           const configIniSql = `INSERT INTO config VALUES (2, '', '', 'yyyy/mm/dd', 1, 1, 2, 0, ${dateNow}, ${dateNow}, 0)`;

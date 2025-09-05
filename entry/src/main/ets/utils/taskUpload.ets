@@ -133,6 +133,7 @@ export class TaskUpload {
     }
     console.log(`开始创建TaskItems`);
     this.global.taskGlobalStatus = TaskDoing.YES;
+    this.global.idx = 0
     let exists: boolean = false;
     try {
       exists = await TaskItem.createTask(ctx, this.config);

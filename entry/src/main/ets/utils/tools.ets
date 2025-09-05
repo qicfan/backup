@@ -204,37 +204,6 @@ export async function sha256(buffer: ArrayBuffer) {
     .join('');
 }
 
-async function computeHash(filePath: string, offset: number = 0, length?: number): Promise<string> {
-  let fd = await fileIo.open(filePath, fileIo.OpenMode.READ_ONLY); // 0 表示只读模式
-  try {
-    const hash = cryptoFramework.createMd('SHA1');
-
-    if (length === undefined) { // 完整文件校验逻辑
-      const bufferSize = 4096;
-      let readSize = 0;
-      do {
-        const buf = new ArrayBuffer(bufferSize);
-        readSize = await fileIo.read(fd.fd, buf, { offset });
-        if (readSize > 0) {
-          await hash.update({data: new Uint8Array(buf)});
-          offset += readSize;
-        }
-      } while (readSize > 0);
-    } else { // 片段校验逻辑
-      const buf = new ArrayBuffer(length);
-      await fileIo.read(fd.fd, buf, { offset: offset, length: length });
-      await hash.update({data: new Uint8Array(buf)});
-    }
-
-    const digest = await hash.digest();
-    return Array.from(digest.data)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  } finally {
-    fileIo.close(fd);
-  }
-}
-
 @Concurrent
 export async function Checksum(uri: string) {
   let fd = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY); // 0 表示只读模式
@@ -260,65 +229,6 @@ export async function Checksum(uri: string) {
     fileIo.close(fd);
   }
 }
-
-@Concurrent
-export async function preChecksum(uri: string, size: number) {
-  const fileSize = size;
-
-  let offset = 0;
-  let length = 1024;
-  if (fileSize >= 65536) {
-    offset = 65536 - 1024; // 64KB起始点
-  } else if (fileSize > 1024) {
-    offset = fileSize - 1024;
-  } else {
-    length = fileSize;
-  }
-  let fd: fileIo.File
-  try {
-    fd = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY); // 0 表示只读模式
-    const hash = cryptoFramework.createMd('SHA1');
-    const buf = new ArrayBuffer(length);
-    fileIo.readSync(fd.fd, buf, { offset: offset, length: length });
-    fileIo.close(fd);
-    hash.updateSync({ data: new Uint8Array(buf) });
-
-    const digest = hash.digestSync();
-    return Array.from(digest.data)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  } catch(e) {
-    console.error(`打开文件或者计算哈希失败${uri}, code=${e.code}, msg=${e.message}`)
-    return ""
-  }
-}
-
-// // 计算文件hash
-// export async function calculateFileHash(fileStream: fileIo.Stream, size: number): Promise<string> {
-//   try {
-//     const sha256 = cryptoFramework.createMd('MD5');
-//     const bufferSize = 4096;
-//     let offset = 0;
-//
-//     while (offset < size) {
-//       const readSize = Math.min(bufferSize, size - offset);
-//       const arrayBuffer = new ArrayBuffer(readSize);
-//       // await fileIo.read(file.fd, arrayBuffer, { offset });
-//       await fileStream.read(arrayBuffer, {offset: offset, length: readSize})
-//       await sha256.update({ data: new Uint8Array(arrayBuffer) });
-//       offset += readSize;
-//     }
-//     const hash = await sha256.digest();
-//     // const textDecoder: util.TextDecoder = util.TextDecoder.create(); // 调用util模块的TextDecoder类
-//     // const result: string = textDecoder.decodeToString(hash.data); // 对uint8Array解码
-//     return Array.from(hash.data)
-//       .map(b => b.toString(16).padStart(2, '0'))
-//       .join('');
-//   } catch (error) {
-//     console.error('计算文件哈希出错:', (error as BusinessError).message);
-//     return "";
-//   }
-// }
 
 export function strip(str: string, trip: string) {
   return str.endsWith(trip) ? str.slice(0, -1) : str;

@@ -15,7 +15,7 @@ export struct Upload {
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
   @Local backupServer: BackupServer = AppStorageV2.connect(BackupServer, "BackupServer", () => BackupServer.getInstance())!;
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
-  @Local maxThreadCount: number[] = Array.from<number, number>({length: 5}, (_, index) => index + 1)
+  @Local maxThreadCount: number[] = Array.from<number, number>({length: 1}, (_, index) => index + 1)
   @Local uploadQueue: UploadQueue = AppStorageV2.connect(UploadQueue, "UploadQueue", () => UploadQueue.getInstance())!;
   @Local already: boolean = false
   @Local isEnd: boolean = false // 是否已经无法从数据库中获取到数据（备份线程可以结束）
