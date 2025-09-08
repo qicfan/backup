@@ -1,10 +1,16 @@
 ## 鸿蒙5.0 鸿蒙Next(HarmonyOS Next) 相册备份
 ### 使用websocket协议备份图库到NAS，从NAS下载照片到本地，支持动态照片
 ### 交流Q群：1055648718
+----
 
-#### 测试版本链接：[https://appgallery.huawei.com/link/invite-test-wap?taskId=fd240bafbe726e53ee32649b5f76e39b](https://appgallery.huawei.com/link/invite-test-wap?taskId=fd240bafbe726e53ee32649b5f76e39b)
-#### 基于5.0.4(API 16)，请确保您设备的系统版本大于等于该版本
-#### 本项目为客户端，需要部署服务端才能使用：[https://github.com/qicfan/backup-server](https://github.com/qicfan/backup-server)
+邀请加入测试组链接：[https://www.wjx.cn/vm/YPMZpOi.aspx#](https://www.wjx.cn/vm/YPMZpOi.aspx#)
+
+测试版本链接：[https://appgallery.huawei.com/link/invite-test-wap?taskId=fd240bafbe726e53ee32649b5f76e39b](https://appgallery.huawei.com/link/invite-test-wap?taskId=fd240bafbe726e53ee32649b5f76e39b)
+
+-----
+基于5.0.4(API 16)，请确保您设备的系统版本大于等于该版本
+
+本项目为客户端，需要部署服务端才能使用：[https://github.com/qicfan/backup-server](https://github.com/qicfan/backup-server)
 
 ### TODO LIST
 - [x] 使用关键资产存储服务器、用户名、密码
