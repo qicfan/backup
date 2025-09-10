@@ -19,7 +19,7 @@ export class Photos {
    * @param number lastTimestamp 最后一次备份的时间戳，只取添加时间大于等于该指的照片
    */
   static async getPhotos(ctx: Context, lastTimestamp: number, page: number = 1,
-    pageSize: number = 100): Promise<TaskItem[]> {
+    pageSize: number = 100): Promise<TaskItem[] | boolean> {
     let backupServer = BackupServer.getInstance()
     backupServer.updateConfig(ServerConfig.getInstance(), Config.getInstance())
     const items: TaskItem[] = []
@@ -42,12 +42,12 @@ export class Photos {
         predicates: predicates
       })
       if (fetchRs.getCount() <= 0) {
-        return items;
+        return false;
       }
     } catch (e) {
       let err = e as BusinessError
       console.log(`查询照片失败，code=${err.code}, msg=${err.message}`)
-      return items;
+      return false;
     }
     let taskTotal = 0
     while (!fetchRs.isAfterLast()) {
@@ -61,7 +61,7 @@ export class Photos {
       }
       const item = new TaskItem()
       item.dateAdded = ps.get('date_added') as number;
-      console.log(`是否跳过文件，文件添加时间戳：${item.dateAdded}, 最后一次备份时间：${lastTimestamp}`)
+      // console.log(`是否跳过文件，文件添加时间戳：${item.dateAdded}, 最后一次备份时间：${lastTimestamp}`)
       if (item.dateAdded < lastTimestamp) {
         // console.log(`跳过文件`)
         continue;
@@ -90,8 +90,11 @@ export class Photos {
         if (itemSendable === undefined) {
           continue
         } else {
-          itemSendable.save()
-          items.push(itemSendable.getItem())
+          // console.log(`${itemSendable.remoteUri} => ${itemSendable.checksum}`)
+          let taskItem = itemSendable.getItem()
+          // console.log(`${taskItem.remoteUri} => ${taskItem.checksum}`)
+          taskItem.save()
+          items.push(taskItem)
         }
       }
     }
@@ -445,8 +448,8 @@ async function CheckUriExistsOnServer(item: TaskItemSendable): Promise<TaskItemS
   // } else {
   //   console.log(`通过path查询到文件没有备份：${item.remoteUri}`)
   // }
-  // //2. 通过uri查询是否存在
-  // exists = await item.exists(item.uri, true, false)
+  //2. 通过uri查询是否存在
+  // let exists = await item.exists(item.uri, true, false)
   // if (exists) {
   //   console.log(`通过uri查询到文件已备份：${item.uri}}`)
   //   return undefined
@@ -457,10 +460,10 @@ async function CheckUriExistsOnServer(item: TaskItemSendable): Promise<TaskItemS
   //3. 使用checksum来判断是否存在
   let exists = await item.checksumExists()
   if (exists) {
-    console.log(`通过checksum查询到文件已备份：${item.remoteUri}}`)
+    console.log(`通过checksum查询到文件已备份：${item.remoteUri} => ${item.checksum}`)
     return undefined
   } else {
-    console.log(`通过checksum查询到文件没有备份: ${item.remoteUri}`)
+    console.log(`通过checksum查询到文件没有备份: ${item.remoteUri}  => ${item.checksum}`)
   }
   return item
 }

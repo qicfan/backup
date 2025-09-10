@@ -133,20 +133,20 @@ export class BackupServer {
     return resp.result.data.exists
   }
 
-  // 检查uri对应的checksum是否存在
-  async checksumExists(uri: string) {
-    let checksum = await taskpool.execute(Checksum, uri) as string
-    console.log(`文件的checksum: ${checksum}`)
-    let data: Record<string, string> = {}
-    let header: Record<string, string> = {"X-Checksum": checksum}
-    let resp: HttpResp<PathExists> = await this.post<PathExists>("/api/exists-checksum", header, data)
-    // console.log(JSON.stringify(resp.result))
-    if (!resp || !resp.success || !resp.result) {
-      console.warn(`查询目录或文件 ${uri} 是否存在时失败：${resp.message}`)
-      return false
-    }
-    return resp.result.data.exists
-  }
+  // // 检查uri对应的checksum是否存在
+  // async checksumExists(uri: string) {
+  //   let checksum = await taskpool.execute(Checksum, uri) as string
+  //   console.log(`文件的checksum: ${checksum}`)
+  //   let data: Record<string, string> = {}
+  //   let header: Record<string, string> = {"X-Checksum": checksum}
+  //   let resp: HttpResp<PathExists> = await this.post<PathExists>("/api/exists-checksum", header, data)
+  //   // console.log(JSON.stringify(resp.result))
+  //   if (!resp || !resp.success || !resp.result) {
+  //     console.warn(`查询目录或文件 ${uri} 是否存在时失败：${resp.message}`)
+  //     return false
+  //   }
+  //   return resp.result.data.exists
+  // }
   // basePath下的子目录列表
   async dirList(path: string): Promise<DirItem[]>{
     let data: Record<string, string> = {"path": path}

@@ -311,27 +311,25 @@ export class TaskItem {
    */
   static async createTask(ctx: Context, config: Config) {
     let lastTimestamp: number = config.lastBackupTime;
-
     let page = 1;
     const pageSize = 100;
     let total = 0;
     let lastTime = 0
     while (true) {
       // 1. 收集相册内容，并且写入taskItem表
-      const items = await Photos.getPhotos(ctx, lastTimestamp, page, pageSize)
+      const items: TaskItem[] | boolean = await Photos.getPhotos(ctx, lastTimestamp, page, pageSize)
+      if (items === false) {
+        // 已经遍历完成
+        break
+      }
+      let taskItems = items as TaskItem[]
       // 写入数据库
-      if (items.length === 0) {
-        console.log(`本次未查询到照片数据`)
-        break;
-      }
-      total += items.length
-      if (items.length < pageSize) {
-        break;
-      }
-      lastTime = items[items.length - 1].dateAdded
-      if (lastTime > 0) {
-        // 修改最后备份时间
-        await config.updateLastBackupTime(lastTime)
+      if (taskItems.length > 0) {
+        lastTime = taskItems[taskItems.length - 1].dateAdded
+        if (lastTime > 0) {
+          // 修改最后备份时间
+          await config.updateLastBackupTime(lastTime)
+        }
       }
       page++
     }

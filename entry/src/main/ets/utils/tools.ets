@@ -190,41 +190,32 @@ export function fileSize(filePath: string): number {
 
 }
 
-export async function sha256(buffer: ArrayBuffer) {
-  let mdAlgName = 'SHA256'; // 摘要算法名。
-  let md = cryptoFramework.createMd(mdAlgName);
-  // 数据量较少时，可以只做一次update，将数据全部传入，接口未对入参长度做限制。
-  await md.update({ data: new Uint8Array(buffer) });
-  let mdResult = await md.digest();
-  // console.info('Md result:' + mdResult.data);
-  let mdLen = md.getMdLength();
-  // console.info("md len: " + mdLen);
-  return Array.from(mdResult.data)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 @Concurrent
-export async function Checksum(uri: string) {
-  let fd = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY); // 0 表示只读模式
+export async function Checksum(uri: string, size: number) {
+  let fd = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY); // 0 表示只读模式
   try {
-    const hash = cryptoFramework.createMd('SHA1');
+    const md = cryptoFramework.createMd('SHA1');
     const bufferSize = 4096;
     let readSize = 0;
     let offset = 0
-    do {
-      const buf = new ArrayBuffer(bufferSize);
-      readSize = await fileIo.read(fd.fd, buf, { offset });
-      if (readSize > 0) {
-        await hash.update({data: new Uint8Array(buf)});
-        offset += readSize;
-      }
-    } while (readSize > 0);
-
-    const digest = await hash.digest();
-    return Array.from(digest.data)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    let chunkCount = Math.ceil(size / bufferSize);
+    for (let i = 0; i < chunkCount; i++) {
+      let start = i * bufferSize;
+      let end = Math.min(start + bufferSize, size);
+      let buffer = new ArrayBuffer(end - start);
+      fileIo.readSync(fd.fd, buffer, { offset: start, length: end - start });
+      let updateMessageBlob: cryptoFramework.DataBlob = { data: new Uint8Array(buffer) };
+      md.updateSync(updateMessageBlob);
+    }
+    const digest = md.digestSync();
+    let bytes = digest.data
+    let mdLen = md.getMdLength()
+    let hexString = '';
+    for (let i = 0; i < mdLen; i++) {
+      let char = ('00' + bytes[i].toString(16)).slice(-2);
+      hexString += char;
+    }
+    return hexString;
   } finally {
     fileIo.close(fd);
   }

@@ -142,9 +142,9 @@ export class TaskItemSendable {
   }
 
   async checksumExists() {
-    let checksum = await Checksum(this.uri) as string
+    let checksum = await Checksum(this.uri, this.size) as string
     this.checksum = checksum
-    console.log(`文件的checksum: ${checksum}`)
+    // console.log(`文件的checksum: ${checksum}`)
     let data: Record<string, string> = {}
     let header: Record<string, string> = {"X-Checksum": checksum}
     let resp: HttpResp<PathExists> = await this.request<PathExists>("/api/exists-checksum", http.RequestMethod.POST, header, data)
