@@ -17,14 +17,15 @@ export struct Login {
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
   @Local addBtnLoading: boolean = false;
   @Local isHttps: boolean = false
-  @Local serverHost: string = "192.168.1.1"
-  @Local serverPort: string = "12334"
-  @Local username: string = "admin"
-  @Local password: string = "admin"
+  @Local serverHost: string = ""
+  @Local serverPort: string = ""
+  @Local username: string = ""
+  @Local password: string = ""
 
   pop: boolean = false;
 
   async addServer() {
+    this.global.toSetting = this.config.backupRootPath === ""
     this.pop = this.pageInfos.getParamByIndex(1) as boolean;
     // 判断数据是否为空
     if (this.serverHost === '' || this.serverPort === '' || this.username === '' || this.password === '') {
@@ -70,6 +71,11 @@ export struct Login {
         this.config.backupRootPath = ""
         await this.config.update()
       }
+      IBestNotify.show({
+        type: "success",
+        message: "服务器添加成功，如未设置备份路径则会自动跳转",
+        duration: 3000
+      })
       this.pageInfos.pop();
     } catch (error) {
       let err = error as BusinessError;
@@ -80,7 +86,6 @@ export struct Login {
       this.addBtnLoading = false
       console.error(`Failed to updated Asset. Code is ${err.code}, message is ${err.message}`);
     }
-
     return
   }
 
@@ -89,16 +94,21 @@ export struct Login {
     if (this.server.server == "") {
       return
     }
-    let urlObj = url.URL.parseURL(this.server.server)
-    let protocol = urlObj.protocol
-    this.isHttps = false
-    if (protocol == 'https') {
-      this.isHttps = true
+    try {
+      let urlObj = url.URL.parseURL(this.server.server)
+      let protocol = urlObj.protocol
+      this.isHttps = false
+      if (protocol == 'https') {
+        this.isHttps = true
+      }
+      this.serverHost = urlObj.hostname
+      this.serverPort = urlObj.port
+      this.username = this.server.username
+      this.password = this.server.password
+    } catch (e) {
+      console.error(`解析服务器链接失败：${e.message}`)
+      return
     }
-    this.serverHost = urlObj.hostname
-    this.serverPort = urlObj.port
-    this.username = this.server.username
-    this.password = this.server.password
   }
 
   aboutToDisappear(): void {
@@ -115,20 +125,21 @@ export struct Login {
     NavDestination() {
       Scroll() {
         Column() {
-          Text("请先安装服务端(同样是开源项目)再进行登录和备份，服务端地址：https://github.com/qicfan/backup-server")
+          Text("请先安装服务端(同样是开源项目)再进行登录和备份，服务端地址：https://gitee.com/qicfan/backup-server\n" +
+            "如果要启用SSL，需要在服务端配置证书，否则不要勾选。")
             .width('100%')
             .padding($r('app.float.normal_padding'))
           IBestField({
             value: this.serverHost!!,
             label: "IP或域名",
             required: true,
-            placeholder: "192.168.1.1",
+            placeholder: "192.168.1.2",
           })
           IBestField({
             value: this.serverPort!!,
             label: "端口",
             required: true,
-            placeholder: "5005",
+            placeholder: "12334",
           })
           IBestCell({
             title: '是否启用HTTPS',
@@ -169,7 +180,7 @@ export struct Login {
       .width('100%')
       .height('100%')
     }
-    .title("添加WebDav服务器")
+    .title("添加备份服务器")
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.ibest_background'))

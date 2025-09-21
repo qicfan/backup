@@ -23,12 +23,12 @@ export struct About {
           right: $r('app.float.normal_padding'),
         })
       Column() {
-        Text("APP仓库: https://github.com/qicfan/backup")
+        Text("APP仓库: https://gitee.com/qicfan/backup")
           .width('100%')
           .textAlign(TextAlign.Start)
           .fontSize($r("sys.float.ohos_id_popup_text_font_size"))
           .fontColor($r("app.color.ibest_field_prefix_font_color"))
-        Text("服务端仓库: https://github.com/qicfan/backup-server")
+        Text("服务端仓库: https://githee.com/qicfan/backup-server")
           .width('100%')
           .textAlign(TextAlign.Start)
           .fontSize($r("sys.float.ohos_id_popup_text_font_size"))

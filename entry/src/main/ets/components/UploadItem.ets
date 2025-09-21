@@ -1,6 +1,6 @@
 import { UploadQueue } from "../utils/UploadQueue";
 import { AppStorageV2 } from "@kit.ArkUI";
-import { ErrorEvent, MessageEvents, worker } from "@kit.ArkTS";
+import { MessageEvents, worker } from "@kit.ArkTS";
 import { ApiResponse, BackupServer, PathItem } from "../utils/server";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { Photos } from "../utils/photos";
@@ -13,6 +13,7 @@ import { Global } from "../models/Global";
 import { TaskItem } from "../models/TaskItem";
 import { IBestIcon, IBestProgress } from "@ibestservices/ibest-ui-v2";
 import { fileIo } from "@kit.CoreFileKit";
+import { common } from "@kit.AbilityKit";
 
 @ComponentV2
 export struct UploadItem {
@@ -30,7 +31,7 @@ export struct UploadItem {
   @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
   @Event finish: (index: number) => void = () => {};
   private idle: boolean = true // 是否空闲，如果为true则从队列中继续获取数据
-  private ctx: Context = getContext(this)
+  private ctx: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
   private SI: number = 0
   private preSize: number = 0
   @Local isFinish: boolean = false
@@ -81,7 +82,11 @@ export struct UploadItem {
   aboutToDisappear(): void {
     // 销毁子线程
     console.log(`销毁子线程 ${this.index}`)
-    this.uploadWorker.terminate()
+    try {
+      this.uploadWorker.terminate()
+    } catch (error) {
+      console.warn("销毁子线程出错：" + error.message)
+    }
   }
 
   async process() {
@@ -110,7 +115,11 @@ export struct UploadItem {
     if (item.subType == photoAccessHelper.PhotoSubtype.MOVING_PHOTO) {
       // 如果是动态照片则先将文件保存到本地沙箱目录
       let movingPhoto = await Photos.getMovingPhoto(this.ctx, photoAsset)
-      await movingPhoto.requestContent(item.fileUri, item.videoUri)
+      try {
+        await movingPhoto.requestContent(item.fileUri, item.videoUri)
+      } catch (error) {
+        console.warn("动态图片保存失败：" + error.message)
+      }
       // 视频和普通照片责直接上传
       let uploadEvent: UploadEvent = {
         path: this.config.backupRootPath !== "" ? this.config.backupRootPath + '/' + item.remoteUri : item.remoteUri,
@@ -136,8 +145,16 @@ export struct UploadItem {
       this.fileSize = item.videoSize
       await this.upload(item, uploadVideoEvent, true)
       // 删除本地文件
-      await fileIo.unlink(item.fileUri)
-      await fileIo.unlink(item.videoUri)
+      try {
+        await fileIo.unlink(item.fileUri)
+      } catch (error) {
+        console.warn("文件删除失败1:" + error.message)
+      }
+      try {
+        await fileIo.unlink(item.videoUri)
+      } catch (error) {
+        console.warn("文件删除失败2:" + error.message)
+      }
     } else {
       let fileUri = this.config.backupRootPath + '/' + item.remoteUri
       if (this.config.backupRootPath === "") {
@@ -157,19 +174,15 @@ export struct UploadItem {
     }
     this.idle = true
     return 0
-    // // 在调用terminate后，执行onexit
-    // this.uploadWorker.onexit = (code) => {
-    //   console.info("main thread terminate");
-    // }
-    // // 监听Worker错误
-    // this.uploadWorker.onerror = (err: ErrorEvent) => {
-    //   console.error("main error message " + err.message);
-    // }
   }
 
   async upload(item: TaskItem, uploadFile: UploadEvent, isMovingPhotoVideo: boolean): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      this.uploadWorker.postMessage(uploadFile)
+    return new Promise((resolve) => {
+      try {
+        this.uploadWorker.postMessage(uploadFile)
+      } catch (error) {
+        console.warn("主线程向子线程发送消息失败：" + error.message)
+      }
       // 宿主线程接收worker线程信息
       this.uploadWorker.onmessage = async (e: MessageEvents) => {
         // data：worker线程发送的信息

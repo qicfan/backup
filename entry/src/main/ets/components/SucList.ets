@@ -1,11 +1,14 @@
 import { CommonConstants } from "../common/CommonConstants";
-import { IBestEmpty, IBestNotify } from "@ibestservices/ibest-ui-v2";
+import { IBestButton, IBestEmpty, IBestNotify } from "@ibestservices/ibest-ui-v2";
 import { SucTaskItemDataSource } from "../models/TaskItemDataSource";
 import { WinBreakpoint } from "../common/WinBreakpoint";
 import { AppStorageV2 } from "@kit.ArkUI";
 import { Global } from "../models/Global";
 import { BackupServer, ServerPhotoItem } from "../utils/server";
 import { ServerPhotoItemComponent } from "./ServerPhotoItemComponent";
+import { ServerConfig } from "../models/Server";
+import { Config } from "../models/Config";
+import { ConfigGlobalStatus, LoginStatus } from "../typing";
 
 @ComponentV2
 export struct SucList {
@@ -14,14 +17,20 @@ export struct SucList {
   @Local winBP: WinBreakpoint =
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
+  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
+  @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
   @Local backupServer: BackupServer = AppStorageV2.connect(BackupServer, "BackupServer", () => BackupServer.getInstance())!;
   @Provider("taskItemDataSource") data: SucTaskItemDataSource = new SucTaskItemDataSource();
+  @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack();
   @Local total: number = 0
   private scroller: Scroller = new Scroller();
   page: number = 1;
   pageSize: number = 50;
   aboutToAppear(): void {
-    this.getList(1).then(() => {})
+    if (this.server.server !=="" && this.config.backupRootPath !== "") {
+      this.getList(1).then(() => {
+      })
+    }
   }
 
   async getList(page: number = 1) {
@@ -70,47 +79,62 @@ export struct SucList {
     }
   }
 
+  @Builder Btn() {
+    IBestButton({ text: '添加服务器', type: 'primary', onBtnClick: () => {
+      this.pageInfos.pushPath({ name: "login" })
+    } })
+      .padding({top: $r("app.float.normal_padding")})
+  }
+
   build() {
     Column() {
-      Refresh({ refreshing: $$this.isRefreshing, promptText: "下拉刷新"}) {
-        if (this.total > 0) {
-          Grid(this.scroller) {
-            LazyForEach(this.data, (item: ServerPhotoItem, index: number) => {
-              GridItem() {
-                ServerPhotoItemComponent({ serverPhotoItem: item, index: index })
-              }
-            }, (item: ServerPhotoItem) => item.path)
-          }
-          .margin($r('app.float.normal_padding'))
-          .cachedCount(10)
-          .rowsGap(3)
-          .columnsGap(3)
-          .columnsTemplate(`repeat(auto-fit, ${this.winBP.imageSize})`)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.PARENT_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST,
-          })
-          .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-          .scrollBar(BarState.Auto)
-          .onScrollIndex((start: number, end: number) => {
-            if (!this.hasMore) return;
-            if (end < this.data.totalCount() - 1) return;
-            this.isLoading = true;
-            this.getList(this.page + 1).then(() => {
-              this.isLoading = false;
+      if (this.global.loginStatus == LoginStatus.LOGIN && this.global.configGlobalStatus == ConfigGlobalStatus.YES) {
+        Refresh({ refreshing: $$this.isRefreshing, promptText: "下拉刷新" }) {
+          if (this.total > 0) {
+            Grid(this.scroller) {
+              LazyForEach(this.data, (item: ServerPhotoItem, index: number) => {
+                GridItem() {
+                  ServerPhotoItemComponent({ serverPhotoItem: item, index: index })
+                }
+              }, (item: ServerPhotoItem) => item.path)
+            }
+            .margin($r('app.float.normal_padding'))
+            .cachedCount(10)
+            .rowsGap(3)
+            .columnsGap(3)
+            .columnsTemplate(`repeat(auto-fit, ${this.winBP.imageSize})`)
+            .nestedScroll({
+              scrollForward: NestedScrollMode.PARENT_FIRST,
+              scrollBackward: NestedScrollMode.SELF_FIRST,
             })
-          })
-        } else {
-          IBestEmpty({
-            description: "还没有已备份的照片或视频"
-          })
+            .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
+            .scrollBar(BarState.Auto)
+            .onScrollIndex((start: number, end: number) => {
+              if (!this.hasMore) return;
+              if (end < this.data.totalCount() - 1) return;
+              this.isLoading = true;
+              this.getList(this.page + 1).then(() => {
+                this.isLoading = false;
+              })
+            })
+          } else {
+            IBestEmpty({
+              description: "还没有已备份的照片或视频"
+            })
+          }
         }
+        .width('100%')
+        .height('100%')
+        .onRefreshing(() => {
+          this.onRefresh('pull')
+        })
+      } else {
+        // 显示去登录的按钮
+        IBestEmpty({
+          description: '添加服务器后显示服务器中已备份的照片和视频',
+          defaultBuilder: (): void => this.Btn()
+        })
       }
-      .width('100%')
-      .height('100%')
-      .onRefreshing(() => {
-        this.onRefresh('pull')
-      })
     }
     .width(CommonConstants.FULL_PERCENT)
     .height(CommonConstants.FULL_PERCENT)

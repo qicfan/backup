@@ -47,6 +47,10 @@ export struct Settings {
   private ctx: UIContext = this.getUIContext();
 
   private openFolderSelectDialog() {
+    if (this.server.server === "") {
+      this.pageInfos.pushPath({ name: "login" })
+      return ;
+    }
     Dialog.setContext(this.ctx);
     Dialog.setContentNode(new ComponentContent(this.ctx, wrapBuilder(buildDirSelect), new Params(this.config.backupRootPath)));
     Dialog.setOptions({
@@ -127,7 +131,7 @@ export struct Settings {
           Cell({
             title: "服务器",
             left: this.server.server,
-            content: `登录用户：${this.server.username}`,
+            content: `已登录用户：${this.server.username}`,
             showArrow: true
           })
             .onClick(() => {
@@ -194,10 +198,10 @@ export struct Settings {
 
           About()
 
-          Text("陕ICP备2025065287号-2A")
-            .width('100%')
-            .textAlign(TextAlign.Center)
-            .margin({ top: $r('app.float.normal_padding'), bottom: $r('app.float.normal_padding') })
+          // Text("陕ICP备2025065287号-2A")
+          //   .width('100%')
+          //   .textAlign(TextAlign.Center)
+          //   .margin({ top: $r('app.float.normal_padding'), bottom: $r('app.float.normal_padding') })
 
           // 弹出层
           IBestPopup({

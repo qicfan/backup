@@ -17,8 +17,7 @@ import { TaskItemDetail } from "../components/TaskItemDetail";
 import { BackupServer } from "../utils/server";
 import { ServerPhotoItemDetail } from "../components/ServerPhotoItemDetail";
 import { TaskUpload } from "../utils/taskUpload";
-import { checkTempUsed, cleanTemp } from "../utils/tools";
-import { taskpool } from "@kit.ArkTS";
+import { common } from "@kit.AbilityKit";
 
 @Builder
 function buildTip(params: TipDialogParams) {
@@ -46,8 +45,10 @@ struct Index {
   @Local creatingTask: boolean = false;
   @Local init: number = 0;
 
+  ctx: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+
   private uiContext: UIContext = this.getUIContext();
-  private contentNode = new ComponentContent(this.getUIContext(), wrapBuilder(buildTip), new TipDialogParams((init: boolean) => {this.closeDialog(init)},  this.pageInfos));
+  private contentNode = new ComponentContent(this.getUIContext(), wrapBuilder(buildTip), new TipDialogParams(() => {this.closeDialog()},  this.pageInfos));
 
   private openTipDialog() {
     const node: FrameNode | null = this.getUIContext().getFrameNodeById("home") || null;
@@ -61,11 +62,15 @@ struct Index {
         return false;
       }
     };
-    this.uiContext.getPromptAction().openCustomDialog(this.contentNode, options);
+    this.uiContext.getPromptAction().openCustomDialog(this.contentNode, options).catch(() => {
+      console.warn("打开使用须知弹窗失败")
+    });
   }
 
-  private closeDialog(init: boolean) {
-    this.uiContext.getPromptAction().closeCustomDialog(this.contentNode);
+  private closeDialog() {
+    this.uiContext.getPromptAction().closeCustomDialog(this.contentNode).catch(() => {
+      console.warn("关闭使用须知弹窗失败")
+    });
     this.initApp().then();
   }
 
@@ -77,16 +82,9 @@ struct Index {
     console.log('进入首页')
     this.initApp().then((rs) => {
       if (!rs) return ;
-      let ctx = getContext(this)
-      const tempDir = ctx.tempDir
-      // checkTempUsed(tempDir).then((rs) => {
-      //   if (!rs) {
-      //     return
-      //   }
-      //   cleanTemp(tempDir).then(() => {})
-      // })
+      let ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
       console.log(`开始创建任务`);
-      (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
+      (TaskUpload.getInstance()).startCreateTask(ctx).then()
     })
   }
 
@@ -94,7 +92,7 @@ struct Index {
     console.log('app切换到后台或者离开首页');
     if (this.global.processId > 0) {
       console.log(`index 触发 后台任务`);
-      (BackGroundUtil.getInstance()).startBackground();
+      (BackGroundUtil.getInstance()).startBackground(this.ctx);
     } else {
       console.log(`index 未触发 后台任务, ${this.global.processId}, ${canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask")}`);
     }
@@ -112,14 +110,15 @@ struct Index {
       } else {
         return false;
       }
+      return true
     } else {
       return false;
     }
-    return true;
   }
 
   // 检查是否第一次打开，如果是则弹出提示窗口
   async checkFirst(): Promise<boolean> {
+    console.log('check 是否同意协议')
     if (this.config.first === 0) {
       this.openTipDialog();
       return false;
@@ -135,7 +134,6 @@ struct Index {
       // 没有服务器配置
       console.warn('找不到服务器设置，重新登录')
       this.init = 1;
-      this.pageInfos.pushPath({ name: "login" })
       return false;
     }
     this.global.loginStatus = LoginStatus.NO_LOGIN;
@@ -146,7 +144,6 @@ struct Index {
       this.init = 1;
       // 登录失败，重新登录
       console.warn('登录失败，重新登录')
-      this.pageInfos.pushPath({ name: "login" });
       return false;
     }
     this.global.loginStatus = LoginStatus.LOGIN;
@@ -159,17 +156,20 @@ struct Index {
     if (configExists === 0) {
       // 不存在设置，跳转到设置页面
       this.init = 2;
-      // this.pageInfos.pushPath({ name: "Settings" })
-      this.global.tabIndex = 2;
+      if (this.global.toSetting) {
+        this.global.tabIndex = 2;
+      }
       return false;
     }
     if (configExists === 2) {
       // 没有设置备份目录，提示并跳转
-      IBestNotify.show({
-        message: "您还没有设置备份路径"
-      })
+      // IBestNotify.show({
+      //   message: "您还没有设置备份路径"
+      // })
+      if (this.global.toSetting) {
+        this.global.tabIndex = 2;
+      }
       this.init = 2;
-      this.global.tabIndex = 2;
       return false;
     }
     this.global.configGlobalStatus = ConfigGlobalStatus.YES
@@ -205,9 +205,14 @@ struct Index {
     .width('100%')
     .height('100%')
     .onNavBarStateChange((isVisible: boolean) => {
-      if (!isVisible) return ;
-      console.log(`回到首页`);
-      this.initApp().then(() => {});
+      if (!isVisible) {
+        this.uiContext.getPromptAction().closeCustomDialog(this.contentNode).catch(() => {
+          console.warn("关闭使用说明弹窗出错")
+        });
+        return;
+      } else {
+        this.initApp().then(() => {});
+      }
     })
   }
 }

@@ -168,7 +168,7 @@ export class TaskItem {
       if (rs === undefined || rs.rowCount <= 0) {
         return [];
       }
-      console.log(`查询到的待上传总数:${rs.rowCount}`);
+      // console.log(`查询到的待上传总数:${rs.rowCount}`);
       const items: TaskItem[] = [];
       const willDeleteIds: number[] = []
       while (rs.goToNextRow()) {

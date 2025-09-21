@@ -28,6 +28,9 @@ export struct ServerPhotoItemDetail {
   @Local mp: photoAccessHelper.MovingPhoto | undefined = undefined
   @Local loading: boolean = false
   @Local progress: number = 0
+
+  private ctx: Context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+
   aboutToAppear(): void {
   }
 
@@ -49,9 +52,8 @@ export struct ServerPhotoItemDetail {
     if (this.serverPhotoItem == undefined) {
       return
     }
-    let ctx = getContext(this)
     this.serverPhotoItem.thumbnail =
-      await this.backupServer.getThumbnailUrl(ctx, this.serverPhotoItem.path, '768x768')
+      await this.backupServer.getThumbnailUrl(this.ctx, this.serverPhotoItem.path, '768x768')
     // 将图片转成PixelMap
     // console.log('下载缩略图完成，缩略图：' + this.serverPhotoItem.thumbnail)
     // 获取缩略图路径

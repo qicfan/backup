@@ -9,9 +9,8 @@ import { WinBreakpoint } from "../common/WinBreakpoint";
 import { AppStorageV2 } from "@kit.ArkUI";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
-import { TaskDoing } from "../typing";
-import { BreakpointConstants } from "../common/BreakpointConstants";
 import { Upload } from "./Upload";
+import { common } from "@kit.AbilityKit";
 
 @ComponentV2
 export struct WaitList {
@@ -22,6 +21,7 @@ export struct WaitList {
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Provider("taskItemDataSource") data: WaitTaskItemDataSource = new WaitTaskItemDataSource();
+  ctx: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
   private scroller: Scroller = new Scroller();
   page: number = 1;
@@ -43,8 +43,7 @@ export struct WaitList {
     }
     this.page = page;
     // 查询未备份照片列表
-    let ctx = getContext(this)
-    const items = await TaskItem.getWaitList(ctx, page, this.pageSize)
+    const items = await TaskItem.getWaitList(this.ctx, page, this.pageSize)
     if (this.page === 1) {
       this.data.clearData();
     }

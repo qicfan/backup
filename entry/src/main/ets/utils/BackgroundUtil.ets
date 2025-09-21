@@ -6,7 +6,6 @@ import { TaskItem } from "../models/TaskItem";
 import { notificationManager } from "@kit.NotificationKit";
 
 export class BackGroundUtil {
-  ctxUIAbility: common.UIAbilityContext = getContext() as common.UIAbilityContext;
   global: Global = Global.getInstance();
   private static _instance: BackGroundUtil | null = null;
   private notifyId: number = 0;
@@ -20,40 +19,46 @@ export class BackGroundUtil {
   }
 
   // 停止任务
-  async stopBackground() {
+  async stopBackground(ctx: common.UIAbilityContext) {
     // 触发任务暂停
     // emitter.emit(Global.STOP_TASK_EVENT);
     this.notifyId = 0;
     this.jobId = 0;
     if (canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask") && this.jobId > 0) {
       // 取消长时任务
-      backgroundTaskManager.stopBackgroundRunning(this.ctxUIAbility);
+        backgroundTaskManager.stopBackgroundRunning(ctx).catch((e: BusinessError) => {
+          console.warn("停止长时任务出错：" + e.message + ", Code=" + e.code)
+        });
     }
   }
 
   // 启动长时任务
-  async startBackground() {
+  async startBackground(ctx: common.UIAbilityContext) {
     console.log(`应用退后台，启动后台任务1`)
     if (!canIUse("SystemCapability.ResourceSchedule.BackgroundTaskManager.ContinuousTask") || this.jobId > 0) {
       return "不支持后台任务或者有运行中的任务";
     }
     console.log(`应用退后台，启动后台任务2`)
     // 暂停任务-
-    emitter.once(Global.STOP_BACKGROUND_EVENT, () => this.stopBackground());
+    emitter.once(Global.STOP_BACKGROUND_EVENT, () => this.stopBackground(ctx));
     const wantAgentInfo: wantAgent.WantAgentInfo = {
-      wants: [{ bundleName: this.ctxUIAbility.abilityInfo.bundleName, abilityName: this.ctxUIAbility.abilityInfo.name }],
+      wants: [{ bundleName: ctx.abilityInfo.bundleName, abilityName: ctx.abilityInfo.name }],
       actionType: wantAgent.OperationType.START_ABILITY, requestCode: 0,
       wantAgentFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
     };
     // 监听停止长时任务
-    backgroundTaskManager.on("continuousTaskCancel", (info: backgroundTaskManager.ContinuousTaskCancelInfo) => {
-      // 标记任务状态，然后停止上传
-      console.log(`收到取消长时任务的通知，停止执行当前任务，信息：${JSON.stringify(info)}`);
-      console.log(`当前执行的长时任务ID：${this.notifyId}，要取消的长时任务ID${info.id}`)
-      this.stopBackground();
-    });
+    try {
+      backgroundTaskManager.on("continuousTaskCancel", (info: backgroundTaskManager.ContinuousTaskCancelInfo) => {
+        // 标记任务状态，然后停止上传
+        console.log(`收到取消长时任务的通知，停止执行当前任务，信息：${JSON.stringify(info)}`);
+        console.log(`当前执行的长时任务ID：${this.notifyId}，要取消的长时任务ID${info.id}`)
+        this.stopBackground(ctx);
+      });
+    } catch (e) {
+      console.warn("监听长时任务取消事件出错：" + e.message + ", Code=" + e.code)
+    }
     wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent) => {
-      backgroundTaskManager.startBackgroundRunning(this.ctxUIAbility, ["dataTransfer"], wantAgentObj)
+      backgroundTaskManager.startBackgroundRunning(ctx, ["dataTransfer"], wantAgentObj)
         .then((res: backgroundTaskManager.ContinuousTaskNotification) => {
           this.notifyId = res.notificationId;
           this.jobId = res.continuousTaskId ? res.continuousTaskId : 1;

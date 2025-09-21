@@ -5,9 +5,9 @@ import { photoAccessHelper } from "@kit.MediaLibraryKit";
 import { TaskItemStatus } from "../typing";
 import { IBestLoading } from "@ibestservices/ibest-ui-v2";
 import { IBestSkeletonParagraph } from "@ibestservices/ibest-ui-v2";
-import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 import { WaitTaskItemDataSource } from "../models/TaskItemDataSource";
+import { common } from "@kit.AbilityKit";
 
 @ComponentV2
 export struct TaskItemComponent {
@@ -23,7 +23,7 @@ export struct TaskItemComponent {
   @Local imageStatusIcon: string = "";
   @Local progress: number = 0;
   @Local progressY: number = 100;
-  private ctx: Context = getContext(this);
+  private ctx: Context = this.getUIContext().getHostContext() as common.UIAbilityContext;
   private statusIcon: Record<number, string> = {
     1: "", // WAIT
     2: "sys.media.ohos_public_ok_filled", // SUCCESS
@@ -56,32 +56,6 @@ export struct TaskItemComponent {
       this.data.removeData(this.index)
     })
     this.updateIcon();
-    if (this.taskItem.status !== TaskItemStatus.SUCCESS) {
-      emitter.on(Global.UPDATE_TASK_ITEM_EVENT + '_' + this.taskItem.id, async (data) => {
-        if (!this.taskItem) return;
-        // console.log(`收到taskitem update event: ${JSON.stringify(data)}`);
-        if (data.data?.action === "START") {
-          this.taskItem.status = TaskItemStatus.UPLOADING;
-        }
-        if (data.data?.action === "SUCCESS") {
-          this.taskItem.status = TaskItemStatus.SUCCESS;
-          this.progress = 100;
-          this.progressY = 0;
-        }
-        if (data.data?.action === "FAIL") {
-          this.taskItem.status = TaskItemStatus.FAIL;
-          this.taskItem.failedReason = data.data?.reason;
-          this.progress = 0;
-          this.progressY = 100;
-        }
-        if (data.data?.action === "PROGRESS") {
-          this.taskItem.uploadedSize = data.data?.uploadedSize;
-          this.progress = Math.floor(this.taskItem.uploadedSize / this.taskItem.size * 100);
-          this.progressY = 100 - this.progress;
-        }
-        this.updateIcon();
-      })
-    }
   }
 
   updateIcon() {

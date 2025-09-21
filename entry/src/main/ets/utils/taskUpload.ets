@@ -83,9 +83,9 @@ export class TaskUpload {
     emitter.emit(Global.STOP_BACKGROUND_EVENT);
   }
 
-  checkPerm(): Promise<boolean> {
+  checkPerm(ctx: common.UIAbilityContext): Promise<boolean> {
     return new Promise((resolve) => {
-      checkPermissions(getContext() as common.UIAbilityContext, ['ohos.permission.READ_IMAGEVIDEO', 'ohos.permission.MEDIA_LOCATION']).then((rs) => {
+      checkPermissions(ctx, ['ohos.permission.READ_IMAGEVIDEO', 'ohos.permission.MEDIA_LOCATION']).then((rs) => {
         if (rs) {
           resolve(true)
         } else {
@@ -101,7 +101,7 @@ export class TaskUpload {
   }
 
   // 是否开源收集照片并生成任务
-  async canCreateTask(): Promise<boolean> {
+  async canCreateTask(ctx: common.UIAbilityContext): Promise<boolean> {
     if (this.global.processId > 0) {
       console.warn(`正在执行备份，无法启动收集任务`);
       return false;
@@ -109,11 +109,6 @@ export class TaskUpload {
     // 如果正在创建备份任务
     if (this.global.taskGlobalStatus === TaskDoing.YES) {
       console.warn(`无法启动收集带备份任务，有运行中的创建任务`);
-      return false;
-    }
-    // 检查是否授权读取相册
-    if (!(await this.checkPerm())) {
-      console.warn(`无法启动收集带备份任务，未授权`);
       return false;
     }
     if (this.global.loginStatus !== LoginStatus.LOGIN) {
@@ -124,11 +119,17 @@ export class TaskUpload {
       console.warn(`没有设置备份路径，无法启动创建任务`);
       return false;
     }
+    // 检查是否授权读取相册
+    if (!(await this.checkPerm(ctx))) {
+      console.warn(`无法启动收集带备份任务，未授权`);
+      return false;
+    }
     return true;
   }
 
-  async startCreateTask(ctx: Context): Promise<boolean> {
-    if (!(await this.canCreateTask())) {
+  async startCreateTask(ctx: common.UIAbilityContext): Promise<boolean> {
+    if (!(await this.canCreateTask(ctx))) {
+      console.warn("不满足备份条件")
       return false;
     }
     console.log(`开始创建TaskItems`);

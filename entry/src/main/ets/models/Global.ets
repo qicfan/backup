@@ -10,6 +10,7 @@ export class Global {
   @Trace tabIndex: number = 0; // tab导航当前选中的页面
   @Trace preTotal: number = 0;
   @Trace idx: number = 0 // 收集的照片的数量
+  toSetting: boolean = false // 是否跳转到设置页面并打开备份路径选择
 
   private static _instance: Global | null = null;
 

@@ -9,7 +9,7 @@ export struct Privacy {
     NavDestination() {
       Column() {
         Web({
-          src: "https://agreement-drcn.hispace.dbankcloud.cn/index.html?lang=zh&agreementId=1668279675706681856",
+          src: "https://agreement-drcn.hispace.dbankcloud.cn/index.html?lang=zh&agreementId=1777752014046941376",
           controller: this.controller
         })
       }

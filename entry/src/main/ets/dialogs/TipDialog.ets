@@ -22,22 +22,22 @@ export struct TipDialog {
         .margin({ top: $r('app.float.normal_padding'), bottom: $r('app.float.normal_padding') })
       Scroll() {
         Column() {
-          Text("1. 请选择新目录保存备份，防止文件被误删除。")
+          Text("1. 备份前请在您的NAS（家庭存储服务器）上安装本应用的服务器端，然后请选择新目录保存备份，防止文件被误删除。")
             .width('100%')
             .margin({ bottom: $r('app.float.inner_padding') })
           Text("2. 当服务器上已存在要备份的同名文件时，本应用会根据文件的SHA1哈希值来判断文件是否一致，如果不一致则会删除服务器上的同名文件")
             .width('100%')
             .margin({ bottom: $r('app.float.inner_padding') })
-          Text("3. 备份时本应用退到后台时应用会申请类型为'数据传输'的后台任务，后台任务执行时会在通知栏显示进度。")
+          Text("3. 备份时本应用退到后台时会申请类型为'数据传输'的后台任务，后台任务执行时会在通知栏显示进度。")
             .width('100%')
             .margin({ bottom: $r('app.float.inner_padding') })
           Text("4. 后台任务执行可能被系统强行中止，碰到此种情况可打开应用重新开始备份。")
             .width('100%')
             .margin({ bottom: $r('app.float.inner_padding') })
-          Text("5. 由于本应用备份导致的文件丢失，本应用概不负责。")
+          Text("5. 由于本应用备份导致的文件丢失，本应用概不负责，备份完成后请检查文件确实存在于服务器中再删除本机上的源文件")
             .width('100%')
             .margin({ bottom: $r('app.float.inner_padding') })
-          Text('点击下方"同意"按钮表示您同意我们的')
+          Text('点击下方"同意"按钮表示您该须知和下方的协议')
             .width('100%')
           Row() {
             Text("《隐私协议》")
@@ -46,7 +46,6 @@ export struct TipDialog {
               .onClick(() => {
                 console.log(`跳转到隐私协议`);
                 this.pageInfos.pushPathByName("PrivacyComponent", "");
-                this.close(false);
               })
               .onHover((flag) => {
                 if (flag) {
@@ -62,7 +61,6 @@ export struct TipDialog {
               .onClick(() => {
                 console.log(`跳转到用户协议`)
                 this.pageInfos.pushPathByName("agreement", "");
-                this.close(false);
               })
               .onHover((flag) => {
                 if (flag) {

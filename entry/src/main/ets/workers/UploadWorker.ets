@@ -57,14 +57,17 @@ async function doUpload(uploadFile: UploadEvent) {
   let chunkCount = Math.ceil(fileSize / chunkSize);
   console.log(`${uploadFile.path} 文件大小 ${stat.size}, 分片大小: ${chunkSize}, 分片数量: ${chunkCount}`)
   let wsObj = await connectWs(uploadFile)
-  wsObj.on('message', (err: BusinessError<void>, data: string | ArrayBuffer) => {
+  wsObj.on('message', (err: BusinessError, data: string | ArrayBuffer) => {
+    console.log("收到消息", err?.message, data)
     try {
-      // console.log('ws message: ' + data as string)
+      console.log('ws message: ' + data as string)
       let resp = JSON.parse(data as string) as ApiResponse<PathItem>;
       if (resp.code == 3) {
         // 服务端出现错误需要断开连接重连
         console.log(`服务端出现错误，需要重连：${resp.message}`)
-        wsObj.close()
+        wsObj.close().catch(() => {
+          console.log("web socket关闭失败")
+        })
         ws = undefined
         workerPort.postMessage(resp)
       }
@@ -77,7 +80,7 @@ async function doUpload(uploadFile: UploadEvent) {
         workerPort.postMessage(resp)
       }
     } catch (e) {
-      // console.log('收到消息:', data as string);
+      console.log('接受消息失败:' + e.message);
     }
   });
   // 启动定时器测速
@@ -88,7 +91,11 @@ async function doUpload(uploadFile: UploadEvent) {
     let size = (CURRENT_SIZE - LAST_SIZE) * 2 // 速度，字节
     PROGRESS = Math.floor(CURRENT_SIZE / fileSize * 100)
     let rs: ApiResponse<number[]> = {code: 2, message: "", data: [size, CURRENT_SIZE, PROGRESS]}
-    workerPort.postMessage(rs)
+    try {
+      workerPort.postMessage(rs)
+    } catch (error) {
+      console.warn("子线程向主线程发送消息失败1: " + error.message)
+    }
     LAST_SIZE = CURRENT_SIZE
   }, 500)
   // 循环发送数据帧
@@ -110,25 +117,39 @@ async function doUpload(uploadFile: UploadEvent) {
       fileName: uploadFile.path,
       type: uploadFile.type, // 普通照片，按需调整
       live_photo_video_path: uploadFile.live_photo_video_path,
-      mtime: Math.floor(stat.mtime / 1000),
-      ctime: Math.floor(stat.ctime / 1000),
+      mtime: stat.mtime,
+      ctime: stat.ctime,
       fileUri: '',
       size: fileSize,
       chunkCount: chunkCount,
       checksum: uploadFile.checksum,
       chunkIndex: i
     };
-    await wsObj.send(JSON.stringify(chunk)); // 先发JSON帧
-    await wsObj.send(buffer); // 再发二进制分片数据
+    console.log("分片数据: " + JSON.stringify(chunk))
+    try {
+      await wsObj.send(JSON.stringify(chunk));  // 先发JSON帧
+      await wsObj.send(buffer); // 再发二进制分片数据
+      console.log(`分片 ${i} 发送完成`)
+    } catch (error) {
+      console.warn("上传数据发送失败: " + error.message)
+    }
     CURRENT_SIZE = end
   }
   let rs: ApiResponse<number[]> = {code: 2, message: "", data: [0, fileSize, 100]}
-  workerPort.postMessage(rs)
+  try {
+    workerPort.postMessage(rs)
+  } catch (error) {
+    console.warn("子线程向主线程发送消息失败2: " + error.message)
+  }
   if (SI > 0) {
     clearInterval(SI)
     SI = 0
   }
-  fileIo.closeSync(file.fd);
+  try {
+    fileIo.closeSync(file.fd);
+  } catch (error) {
+    console.warn("文件关闭失败: " + error.message)
+  }
 }
 
 async function connectWs(uploadFile: UploadEvent): Promise<webSocket.WebSocket> {
@@ -144,16 +165,24 @@ async function connectWs(uploadFile: UploadEvent): Promise<webSocket.WebSocket> 
     } else if (uploadFile.server.indexOf('https://') >= 0) {
       server = uploadFile.server.replace('https', 'wss')
     }
-    wsTmp.connect(`${server}/upload`, { header: {"Sec-WebSocket-Protocol": uploadFile.token}}).then((connected: boolean) => {
+    wsTmp.connect(`${server}/upload`, { header: {"Sec-WebSocket-Protocol": uploadFile.token}})
+      .then((connected: boolean) => {
       if (!connected) {
         let rs: ApiResponse<undefined> = {code: 1, message: "ws服务链接失败", data: undefined}
-        workerPort.postMessage(rs)
+        try {
+          workerPort.postMessage(rs)
+        } catch (error) {
+          console.warn("子线程向主线程发送消息失败3: " + error.message)
+        }
         return
       }
     })
+      .catch((e: BusinessError) => {
+        console.warn("web socket服务链接失败：" + e.message)
+      })
     wsTmp.on('open', async () => {
       ws = wsTmp
-      // console.log(`ws 连接成功：${server}`)
+      console.log(`ws 连接成功：${server}`)
       resolve(ws)
     });
     wsTmp.on('error', (err) => {

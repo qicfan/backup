@@ -7,6 +7,7 @@ import { TaskItemStatus } from "../typing";
 import { dateTimeFromTimestamp } from "../utils/date";
 import { Config } from "../models/Config";
 import { ServerConfig } from "../models/Server";
+import { common } from "@kit.AbilityKit";
 
 @ComponentV2
 export struct TaskItemDetail {
@@ -18,6 +19,7 @@ export struct TaskItemDetail {
   @Local thumbnail: PixelMap | null = null;
   private taskItemId: number | undefined = undefined;
   private controller: VideoController = new VideoController();
+  ctx: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
   private statusName: Record<number, string> = {
     1: "等待备份",
     2: "已备份",
@@ -158,7 +160,7 @@ export struct TaskItemDetail {
         }
         this.taskItem = taskItem;
         if (this.taskItem) {
-          this.taskItem.getThumbnail(getContext(this), 800).then((pm: PixelMap | null) => {
+          this.taskItem.getThumbnail(this.ctx, 800).then((pm: PixelMap | null) => {
             if (pm !== null) {
               this.thumbnail = pm;
             }

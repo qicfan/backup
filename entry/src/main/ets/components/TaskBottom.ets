@@ -6,6 +6,7 @@ import { emitter } from "@kit.BasicServicesKit";
 import { Config } from "../models/Config";
 import { TaskItem } from "../models/TaskItem";
 import { TaskUpload } from "../utils/taskUpload";
+import { ServerConfig } from "../models/Server";
 
 
 @ComponentV2
@@ -14,6 +15,8 @@ export struct TaskBottom {
   @Local progress: number = 0;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
   @Local config: Config = AppStorageV2.connect(Config, "config", () => Config.getInstance())!;
+  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
+  @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack();
 
   private handleId: number|null = null;
 
@@ -108,6 +111,11 @@ export struct TaskBottom {
         })
         .onClick(() => {
           // if (this.total <= 0) return;
+          if (this.server.server === "") {
+            // 去登录
+            this.pageInfos.pushPath({ name: "login" })
+            return;
+          }
           if (this.global.processId > 0) {
             this.stopTask();
           } else {

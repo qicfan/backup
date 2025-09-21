@@ -3,10 +3,12 @@ import { BreakpointConstants } from "../common/BreakpointConstants";
 import { CommonConstants } from "../common/CommonConstants";
 import { WinBreakpoint } from "../common/WinBreakpoint";
 import { Settings } from "./Settings";
-import { TabItem } from "../typing";
+import { ConfigGlobalStatus, LoginStatus, TabItem } from "../typing";
 import { WaitList } from "./WaitList";
 import { SucList } from "./SucList";
 import { Global } from "../models/Global";
+import { ServerConfig } from "../models/Server";
+import { IBestButton, IBestEmpty } from "@ibestservices/ibest-ui-v2";
 
 
 @ComponentV2
@@ -14,7 +16,8 @@ export struct Home {
   @Local winBP: WinBreakpoint =
     AppStorageV2.connect(WinBreakpoint, 'windowBreakpoint', () => WinBreakpoint.getInstance())!;
   @Local global: Global = AppStorageV2.connect(Global, "global", () => Global.getInstance())!;
-
+  @Consumer('pageInfos') pageInfos: NavPathStack = new NavPathStack();
+  @Local server: ServerConfig = AppStorageV2.connect(ServerConfig, "server", () => ServerConfig.getInstance())!;
   aboutToAppear(): void {
   }
 
@@ -23,6 +26,15 @@ export struct Home {
     { icon: $r('app.media.checkmark_circle'), selectedIcon: $r('app.media.checkmark_circle_fill'), name: "云相册" },
     { icon: $r('app.media.gearshape'), selectedIcon: $r('app.media.gearshape'), name: "设置" }
   ]
+
+  @Builder Btn() {
+    IBestButton({ text: '添加服务器', type: 'primary', onBtnClick: () => {
+      console.log("1")
+      // 跳转到添加服务器页面
+      this.pageInfos.pushPath({ name: "login" })
+    } })
+      .padding({top: $r("app.float.normal_padding")})
+  }
 
   @Builder
   BottomTabBuilder(item: TabItem, index: number) {
@@ -52,8 +64,15 @@ export struct Home {
       index: this.global.tabIndex
     }) {
       TabContent() {
-          // 正常屏幕
-          WaitList();
+        if (this.global.loginStatus == LoginStatus.LOGIN && this.global.configGlobalStatus == ConfigGlobalStatus.YES) {
+          WaitList()
+        } else {
+          // 显示去登录的按钮
+          IBestEmpty({
+            description: '添加服务器后才可以开始收集要备份的照片（因为要检查服务器中是否已存在相同的照片）',
+            defaultBuilder: (): void => this.Btn()
+          })
+        }
       }
       .tabBar(this.BottomTabBuilder(this.tabItems[0], 0))
 
@@ -84,10 +103,6 @@ export struct Home {
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .onChange((index: number) => {
       this.global.tabIndex = index;
-      // console.log(`tab切换到${index}`)
-      // if (index === 0) {
-      //   (TaskUpload.getInstance()).startCreateTask(getContext(this)).then()
-      // }
     })
   }
 }

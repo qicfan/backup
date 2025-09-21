@@ -9,6 +9,7 @@ import { UploadItem } from "./UploadItem";
 import { emitter } from "@kit.BasicServicesKit";
 import { Global } from "../models/Global";
 import { checkBattery, checkWifi } from "../utils/tools";
+import { common } from "@kit.AbilityKit";
 
 @ComponentV2
 export struct Upload {
@@ -21,7 +22,7 @@ export struct Upload {
   @Local isEnd: boolean = false // 是否已经无法从数据库中获取到数据（备份线程可以结束）
   private page = 0
   private pageSize  = 100
-  private ctx: Context = getContext(this)
+  private ctx: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
   private SI: number = 0
   private finishIdx: number[] = []
   private existsIds: number[] = []
@@ -108,7 +109,7 @@ export struct Upload {
     }
     items.forEach((item: TaskItem) => {
       if (this.existsIds.includes(item.id)) {
-        console.log(`${item.id} 已经在队列中，队列长度：${this.uploadQueue.length()}`)
+        // console.log(`${item.id} 已经在队列中，队列长度：${this.uploadQueue.length()}`)
         return
       }
       this.existsIds.push(item.id)

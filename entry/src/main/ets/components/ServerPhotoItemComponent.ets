@@ -4,6 +4,7 @@ import { IBestSkeletonParagraph } from "@ibestservices/ibest-ui-v2";
 import { Global } from "../models/Global";
 import { BackupServer, ServerPhotoItem } from "../utils/server";
 import { image } from "@kit.ImageKit";
+import { common } from '@kit.AbilityKit';
 
 @ComponentV2
 export struct ServerPhotoItemComponent {
@@ -20,6 +21,7 @@ export struct ServerPhotoItemComponent {
   @Local imageStatusIcon: string = "";
   @Local progress: number = 0;
   @Local progressY: number = 100;
+  private ctx: Context = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
   private is: image.ImageSource | undefined
 
@@ -28,9 +30,8 @@ export struct ServerPhotoItemComponent {
       // console.warn(`${this.serverPhotoItem?.path} 的缩略图不正常: ${this.serverPhotoItem?.thumbnail}`)
       return
     }
-    let ctx = getContext(this)
     this.serverPhotoItem.thumbnail =
-      await this.backupServer.getThumbnailUrl(ctx, this.serverPhotoItem.path, `${this.winBP.imageSize}x${this.winBP.imageSize}`)
+      await this.backupServer.getThumbnailUrl(this.ctx, this.serverPhotoItem.path, `${this.winBP.imageSize}x${this.winBP.imageSize}`)
     // 将图片转成PixelMap
     // console.log('下载缩略图完成，缩略图：' + this.serverPhotoItem.thumbnail)
     // 获取缩略图路径
