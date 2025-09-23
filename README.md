@@ -1,7 +1,8 @@
-## 鸿蒙5.0 鸿蒙Next(HarmonyOS Next) 相册备份
-### 使用websocket协议备份图库到NAS，从NAS下载照片到本地，支持动态照片
-### 交流Q群：1055648718
+#### 鸿蒙5.0 鸿蒙Next(HarmonyOS Next) 相册备份
+- 使用websocket协议备份图库到NAS，从NAS下载照片到本地，支持动态照片
+- 交流Q群：1055648718
 ----
+**应用已上架，商店搜索：家庭云相册**
 
 邀请加入测试组链接：[https://www.wjx.cn/vm/YPMZpOi.aspx#](https://www.wjx.cn/vm/YPMZpOi.aspx#)
 
