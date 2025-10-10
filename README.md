@@ -25,3 +25,7 @@
 - [x] 支持将apple的动态照片转码成jpg+mp4保存到鸿蒙相册
 - [x] 支持带exif信息的照片备份
 - [x] 通过照片的sha1哈希来判断重复
+
+
+## 请作者喝杯咖啡
+![请作者喝杯咖啡](http://www.mqfamily.top/%E5%BE%AE%E4%BF%A1%E6%94%AF%E4%BB%98%E5%AE%9D.jpg)
