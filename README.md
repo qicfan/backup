@@ -30,4 +30,4 @@
 
 
 ## 请作者喝杯咖啡
-![请作者喝杯咖啡](http://www.mqfamily.top/%E5%BE%AE%E4%BF%A1%E6%94%AF%E4%BB%98%E5%AE%9D.jpg)
+![请作者喝杯咖啡](http://s.mqfamily.top/alipay_wechat.jpg)
